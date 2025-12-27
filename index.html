@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Maximum Reality – Night Run</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #020a2a; font-family: sans-serif; }
+  #controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 10; }
+  button { font-size: 30px; padding: 15px 25px; border-radius: 15px; border: none; background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); }
+  button:active { background: rgba(255,255,255,0.3); }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="controls">
+  <button id="left">⬅️</button>
+  <button id="jump">⬆️</button>
+  <button id="right">➡️</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+/* WORLD CONSTANTS */
+const ROAD_H = 80;
+const GRASS_H = 120;
+const WORLD_WIDTH = 8000;
+const groundY = canvas.height - ROAD_H - 18;
+const treeY = canvas.height - ROAD_H - GRASS_H;
+
+/* PLAYER */
+const player = {
+  x: 300,
+  y: groundY,
+  vy: 0,
+  jumping: false,
+  dir: "right",
+  speed: 6,
+  pngRight: "IMG_2161.png",
+  pngLeft: "IMG_2162.png"
+};
+const imgRight = new Image(); imgRight.src = player.pngRight;
+const imgLeft = new Image(); imgLeft.src = player.pngLeft;
+
+/* CAMERA */
+let cameraX = 0;
+
+/* UFO LOGIC */
+const ufo = {
+  state: "WAITING", // WAITING, INBOUND, ABDUCTING, OUTBOUND
+  x: 0,
+  y: 100,
+  size: 0,
+  targetX: 4465, 
+  timer: 0,
+  beamAlpha: 0
+};
+
+/* WORLD OBJECTS */
+const stars = [];
+for (let i = 0; i < 200; i++) {
+  stars.push({ x: Math.random() * WORLD_WIDTH, y: Math.random() * 300, emoji: ["⭐️", "✨", "🌟"][i % 3] });
+}
+
+const clouds = [];
+for (let i = 0; i < 15; i++) {
+  clouds.push({ x: i * 600, y: 50 + Math.random() * 100 });
+}
+
+const buildings = [];
+for (let i = 0; i < 15; i++) {
+  buildings.push({ x: i * 250, emoji: ["🏢", "🏬", "🏭", "🏨", "🏦"][i % 5], y: treeY + 20 });
+}
+
+const trees = [];
+for (let i = 0; i < 60; i++) {
+  trees.push({ x: i * 140, y: treeY + 30, emoji: "🌲", size: 70 });
+}
+
+const farm = [
+  { emoji: "🏠", x: 4450, y: treeY + 10, h: 100 },
+  { emoji: "🚜", x: 4400, y: treeY + 50, h: 60 },
+  { emoji: "🐄", x: 4465, y: treeY + 100, h: 50, abducted: false },
+  { emoji: "🐓", x: 4430, y: treeY + 90, h: 20 },
+  { emoji: "🐖", x: 4480, y: treeY + 85, h: 25 }
+];
+
+/* INPUT */
+let keys = { left: false, right: false, jump: false };
+function bind(id, k) {
+  const btn = document.getElementById(id);
+  btn.addEventListener("touchstart", (e) => { e.preventDefault(); keys[k] = true; });
+  btn.addEventListener("touchend", (e) => { e.preventDefault(); keys[k] = false; });
+  btn.addEventListener("mousedown", () => keys[k] = true);
+  btn.addEventListener("mouseup", () => keys[k] = false);
+}
+bind("left", "left"); bind("right", "right"); bind("jump", "jump");
+
+function update() {
+  // Player Movement
+  if (keys.left) { player.x -= player.speed; player.dir = "left"; }
+  if (keys.right) { player.x += player.speed; player.dir = "right"; }
+  if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
+  
+  player.vy += 0.8;
+  player.y += player.vy;
+  if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
+
+  // Camera constraints
+  cameraX = player.x - canvas.width / 2;
+
+  // UFO State Machine
+  const cow = farm.find(f => f.emoji === "🐄");
+  ufo.timer++;
+
+  switch (ufo.state) {
+    case "WAITING":
+      if (ufo.timer > 300) { // Reset loop every ~5 seconds
+        ufo.state = "INBOUND";
+        ufo.x = player.x + 1200; // Start off-screen
+        ufo.y = 50;
+        ufo.size = 5;
+      }
+      break;
+
+    case "INBOUND":
+      ufo.x -= 6;
+      ufo.size = Math.min(90, ufo.size + 0.6);
+      ufo.y = 120 + Math.sin(ufo.timer / 15) * 20;
+      if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING";
+      break;
+
+    case "ABDUCTING":
+      ufo.y = 120 + Math.sin(ufo.timer / 15) * 5;
+      // Beam effect
+      ufo.beamAlpha = Math.min(0.4, ufo.beamAlpha + 0.02);
+      
+      if (!cow.abducted) {
+        if (cow.y > ufo.y + 20) {
+          cow.y -= 2; 
+        } else {
+          cow.abducted = true;
+          ufo.timer = 0;
+        }
+      } else if (ufo.timer > 60) { // Wait a second then leave
+        ufo.state = "OUTBOUND";
+      }
+      break;
+
+    case "OUTBOUND":
+      ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05);
+      ufo.x -= 8; // Fly off to the left
+      ufo.y -= 3;
+      ufo.size = Math.max(0, ufo.size - 0.7);
+      if (ufo.size <= 0) {
+        ufo.state = "WAITING";
+        ufo.timer = 0;
+        cow.y = treeY + 100; // Reset cow
+        cow.abducted = false;
+      }
+      break;
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Background
+  ctx.fillStyle = "#020a2a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Parallax Stars
+  ctx.font = "16px sans-serif";
+  stars.forEach(s => ctx.fillText(s.emoji, s.x - cameraX * 0.1, s.y));
+
+  // Parallax Clouds
+  ctx.font = "50px sans-serif";
+  clouds.forEach(c => ctx.fillText("☁️", c.x - cameraX * 0.3, c.y));
+
+  // Moon
+  ctx.font = "80px sans-serif";
+  ctx.fillText("🌖", 200 - cameraX * 0.05, 120);
+
+  // Static Terrain (moves with camera)
+  ctx.fillStyle = "#2f7d32"; 
+  ctx.fillRect(-cameraX, treeY, WORLD_WIDTH, GRASS_H);
+  ctx.fillStyle = "#444"; 
+  ctx.fillRect(-cameraX, groundY + 10, WORLD_WIDTH, ROAD_H);
+
+  // Assets
+  ctx.font = "100px sans-serif";
+  buildings.forEach(b => ctx.fillText(b.emoji, b.x - cameraX, b.y));
+  
+  trees.forEach(t => {
+    ctx.font = t.size + "px sans-serif";
+    ctx.fillText(t.emoji, t.x - cameraX, t.y);
+  });
+
+  // Farm Scene
+  farm.forEach(f => {
+    if (!f.abducted) {
+      ctx.font = f.h + "px sans-serif";
+      ctx.fillText(f.emoji, f.x - cameraX, f.y);
+    }
+  });
+
+  // UFO & Tractor Beam
+  if (ufo.size > 0) {
+    if (ufo.state === "ABDUCTING" || ufo.beamAlpha > 0) {
+      const gradient = ctx.createLinearGradient(0, ufo.y, 0, groundY + 50);
+      gradient.addColorStop(0, `rgba(0, 255, 255, ${ufo.beamAlpha})`);
+      gradient.addColorStop(1, "rgba(0, 255, 255, 0)");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.moveTo(ufo.x - cameraX + ufo.size/2, ufo.y);
+      ctx.lineTo(ufo.x - cameraX - 40, groundY + 50);
+      ctx.lineTo(ufo.x - cameraX + ufo.size + 40, groundY + 50);
+      ctx.fill();
+    }
+    ctx.font = ufo.size + "px sans-serif";
+    ctx.fillText("🛸", ufo.x - cameraX, ufo.y);
+  }
+
+  // Player
+  const img = player.dir === "right" ? imgRight : imgLeft;
+  if (img.complete) {
+    ctx.drawImage(img, player.x - cameraX - 30, player.y - 60, 60, 60);
+  } else {
+    // Fallback if images don't load
+    ctx.font = "50px sans-serif";
+    ctx.fillText(player.dir === "right" ? "🏃" : "🏃‍♂️", player.x - cameraX - 25, player.y);
+  }
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
