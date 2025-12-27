@@ -25,7 +25,7 @@
   #controls { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 100; }
   button { font-size: 28px; padding: 12px 20px; border-radius: 12px; border: 1px solid rgba(0,255,255,0.5); background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); touch-action: manipulation; width: 75px; height: 65px; }
   
-  #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; font-size: 18px; color: #0ff; text-shadow: 0 0 5px #000; }
+  #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; font-size: 18px; color: #0ff; }
 </style>
 </head>
 <body>
@@ -42,6 +42,7 @@
     <div class="char-btn" onclick="selectChar('woman')"><div>🧍🏼‍♀️</div><p>Woman</p></div>
     <div class="char-btn" onclick="selectChar('wc_woman')"><div>👩🏽‍🦽‍➡️</div><p>Wheelchair W</p></div>
   </div>
+  <p id="high-score-display" style="font-size:12px; margin-top:20px; color:#aaa;"></p>
 </div>
 
 <div id="stats">
@@ -76,9 +77,16 @@ const characters = {
   woman:    { type: 'emoji', right: "🏃🏼‍♀️‍➡️", left: "🏃🏼‍♀️" },
   wc_woman: { type: 'emoji', right: "👩🏽‍🦽‍➡️", left: "👩🏽‍🦽" }
 };
+
 let selectedChar = null;
 const imgRight = new Image();
 const imgLeft = new Image();
+
+function showHighScore() {
+  const hs = localStorage.getItem('maxRealityHS') || 0;
+  document.getElementById('high-score-display').innerText = "BEST MISSION SCORE: " + hs;
+}
+showHighScore();
 
 function selectChar(key) {
   selectedChar = characters[key];
@@ -90,14 +98,17 @@ function selectChar(key) {
   document.getElementById('controls').style.display = 'flex';
   document.getElementById('stats').style.display = 'block';
   resetGame();
-  gameState = "EARTH";
 }
 
-function gameOver() {
+function endGame(msg, color) {
+    const hs = localStorage.getItem('maxRealityHS') || 0;
+    if(score > hs) localStorage.setItem('maxRealityHS', score);
+    
     gameState = "START";
     document.getElementById('overlay').style.display = 'flex';
-    document.getElementById('overlay-msg').innerText = "MISSION FAILED - OUT OF FUEL";
-    document.getElementById('overlay-msg').style.color = "#ff0000";
+    document.getElementById('overlay-msg').innerText = msg;
+    document.getElementById('overlay-msg').style.color = color;
+    showHighScore();
 }
 
 const ROAD_H = 120; const GRASS_H = 140;
@@ -165,7 +176,7 @@ function update() {
     switch (ufo.state) {
       case "WAITING": if (ufo.timer > 300) { ufo.state = "INBOUND"; ufo.x = player.x + 800; ufo.size = 50; } break;
       case "INBOUND": 
-        ufo.x -= 4; // SLOWED DOWN (Enjoy the visuals)
+        ufo.x -= 4; 
         ufo.size = Math.min(115, ufo.size + 0.5); 
         if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING"; 
         break;
@@ -178,7 +189,6 @@ function update() {
       case "OUTBOUND": ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05); ufo.x -= 6; ufo.size -= 0.5; if (ufo.size <= 0) ufo.state = "WAITING"; break;
     }
   } else {
-    // SPACE
     spaceDistance += player.speed;
     if (keys.left) { player.x -= player.speed; player.dir = "left"; }
     if (keys.right) { player.x += player.speed; player.dir = "right"; }
@@ -188,22 +198,24 @@ function update() {
     player.vy += 0.3; player.y += player.vy; player.vy *= 0.96;
     document.getElementById('fuelBar').style.width = player.fuel + '%';
 
-    // Game Over Check
-    if (player.fuel <= 0 && player.y >= canvas.height - 10) gameOver();
+    if (player.fuel <= 0 && player.y >= canvas.height - 10) endGame("MISSION FAILED - OUT OF FUEL", "#ff0000");
 
     fuelTanks.forEach(t => {
       if (!t.collected && Math.abs((player.x % worldWidth) - t.x) < 40 && Math.abs(player.y - t.y) < 40) {
-        t.collected = true; player.fuel = Math.min(100, player.fuel + 40); score += 5;
+        t.collected = true; player.fuel = Math.min(100, player.fuel + 40); score += 15;
       }
     });
 
     if (player.collisionTimer > 0) player.collisionTimer--;
     asteroids.forEach(a => {
         let dx = (player.x % worldWidth) - a.x; let dy = player.y - a.y;
-        if (Math.sqrt(dx*dx + dy*dy) < 40 && player.collisionTimer === 0) { player.collisionTimer = 30; player.vy = 8; score = Math.max(0, score - 5); }
+        if (Math.sqrt(dx*dx + dy*dy) < 40 && player.collisionTimer === 0) { player.collisionTimer = 30; player.vy = 8; score = Math.max(0, score - 10); }
     });
     if (player.y > canvas.height) player.y = canvas.height;
-    if (spaceDistance > 5000 && Math.abs((player.x % worldWidth) - 1000) < 150) { resetEarth(); score += 100; }
+    if (spaceDistance > 5000 && Math.abs((player.x % worldWidth) - 1000) < 150) { 
+        score += 500;
+        endGame("MISSION SUCCESS! PORTAL REACHED", "#00ff00");
+    }
   }
   cameraX = player.x - canvas.width / 2;
 }
@@ -242,7 +254,6 @@ function draw() {
       ctx.fillText("🛸", ufo.x - cameraX, ufo.y + (ufo.size/2));
     }
   } else {
-    // SPACE
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     for(let i=-1; i<2; i++) {
         let off = i * worldWidth;
@@ -255,7 +266,6 @@ function draw() {
     if (spaceDistance > 4000) { ctx.font = "120px serif"; ctx.fillText("🌀", 1000 - (cameraX % worldWidth), canvas.height/2); }
   }
 
-  // PLAYER
   if (selectedChar.type === 'png') {
     const img = (player.dir === "right") ? imgRight : imgLeft;
     if (img.complete) ctx.drawImage(img, player.x - cameraX - 30, player.y - 60, 60, 60);
