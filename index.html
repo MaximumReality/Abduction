@@ -67,27 +67,41 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-/* AUDIO */
-let audioCtx = null, oscillator = null, musicPlaying = false;
+/* --- IMPROVED AUDIO SYSTEM --- */
+let audioCtx = null, musicInterval = null, musicPlaying = false;
+
 function toggleMusic() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   const btn = document.getElementById('musicToggle');
+  
   if (!musicPlaying) {
-    oscillator = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    oscillator.type = 'sawtooth';
-    const t = audioCtx.currentTime;
-    [110, 164, 110, 146].forEach((f, i) => { oscillator.frequency.setValueAtTime(f, t + i * 0.4); });
-    gain.gain.setValueAtTime(0.03, t);
-    oscillator.connect(gain); gain.connect(audioCtx.destination);
-    oscillator.loop = true; oscillator.start();
-    btn.innerText = "🔊"; musicPlaying = true;
+    musicPlaying = true;
+    btn.innerText = "🔊";
+    const playSequence = () => {
+      const t = audioCtx.currentTime;
+      const sequence = [{ f: 110, time: 0.0 }, { f: 110, time: 0.4 }, { f: 130, time: 0.8 }, { f: 146, time: 1.2 }];
+      sequence.forEach(note => {
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(note.f, t + note.time);
+        g.gain.setValueAtTime(0, t + note.time);
+        g.gain.linearRampToValueAtTime(0.02, t + note.time + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + note.time + 0.35);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(t + note.time); osc.stop(t + note.time + 0.4);
+      });
+    };
+    playSequence();
+    musicInterval = setInterval(playSequence, 1600);
   } else {
-    if (oscillator) { oscillator.stop(); oscillator.disconnect(); }
-    btn.innerText = "🔇"; musicPlaying = false;
+    musicPlaying = false;
+    btn.innerText = "🔇";
+    if (musicInterval) clearInterval(musicInterval);
   }
 }
 
+/* --- GAME LOGIC --- */
 let gameState = "START", cameraX = 0, spaceDistance = 0, score = 0;
 const worldWidth = 6000; 
 
@@ -98,6 +112,7 @@ const characters = {
   woman:    { type: 'emoji', right: "🏃🏼‍♀️‍➡️", left: "🏃🏼‍♀️" },
   wc_woman: { type: 'emoji', right: "👩🏽‍🦽‍➡️", left: "👩🏽‍🦽" }
 };
+
 let selectedChar = null;
 const imgRight = new Image(), imgLeft = new Image();
 
@@ -214,7 +229,6 @@ function draw() {
       stars.forEach(s => { ctx.font = "16px serif"; ctx.fillText(s.emoji, s.x + off - cameraX * 0.1, s.y); });
       ctx.fillStyle = "#2f7d32"; ctx.fillRect(off - cameraX, treeY, worldWidth, GRASS_H);
       ctx.fillStyle = "#333"; ctx.fillRect(off - cameraX, groundY + 20, worldWidth, ROAD_H);
-      // RESTORED BUILDINGS
       buildings.forEach(b => { ctx.font = "100px serif"; ctx.fillText(b.emoji, b.x + off - cameraX, treeY + 30); });
       for(let i=0; i<40; i++) { ctx.font = "70px serif"; ctx.fillText("🌲", (i*150) + off - cameraX, treeY + 30); }
       farm.forEach(f => { if (!f.abducted) { ctx.font = f.h + "px serif"; ctx.fillText(f.emoji, f.x + off - cameraX, f.y); } });
