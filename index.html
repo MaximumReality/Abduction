@@ -62,7 +62,15 @@ const ufo = {
 /* OBJECTS */
 const stars = Array.from({length: 200}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 400, emoji: ["⭐", "✨"][Math.floor(Math.random()*2)] }));
 const asteroids = Array.from({length: 40}, () => ({ x: Math.random() * 10000, y: Math.random() * canvas.height, emoji: "🪨" }));
-const buildings = Array.from({length: 15}, (_, i) => ({ x: i * 350, emoji: ["🏢", "🏬", "🏭"][i % 3] }));
+const buildings = Array.from({length: 15}, (_, i) => ({ x: i * 350, emoji: ["🏢", "🏬", "🏭"][i % 5] }));
+
+// Restored Trees - Anchored to the grass/sky line
+const trees = Array.from({length: 60}, (_, i) => ({
+  x: i * 140,
+  y: treeY + 30, // Seated on the horizon
+  size: 70
+}));
+
 const farm = [
   { emoji: "🏠", x: 4450, y: treeY + 10, h: 100 },
   { emoji: "🐄", x: 4465, y: treeY + 100, h: 50, abducted: false }
@@ -84,13 +92,14 @@ function resetEarth() {
   player.isBeingAbducted = false;
   player.y = groundY;
   player.vy = 0;
-  player.x = 300; // Start back at the city
+  player.x = 300;
   spaceDistance = 0;
   ufo.state = "WAITING";
   ufo.timer = 0;
   ufo.beamAlpha = 0;
-  farm.find(f => f.emoji === "🐄").y = treeY + 100;
-  farm.find(f => f.emoji === "🐄").abducted = false;
+  const cow = farm.find(f => f.emoji === "🐄");
+  cow.y = treeY + 100;
+  cow.abducted = false;
 }
 
 function update() {
@@ -106,7 +115,7 @@ function update() {
       if (player.y < ufo.y + 20) {
           gameState = "SPACE";
           player.vy = 0;
-          player.x = 200; // Reset X for space run
+          player.x = 200;
       }
     } else {
       if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
@@ -118,7 +127,7 @@ function update() {
     ufo.timer++;
     switch (ufo.state) {
       case "WAITING":
-        if (ufo.timer > 300) { ufo.state = "INBOUND"; ufo.x = player.x + 1200; ufo.size = 40; }
+        if (ufo.timer > 300) { ufo.state = "INBOUND"; ufo.x = player.x + 1200; ufo.size = 50; ufo.beamAlpha = 0; }
         break;
       case "INBOUND":
         ufo.x -= 9; ufo.size = Math.min(115, ufo.size + 1);
@@ -126,6 +135,7 @@ function update() {
         if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING";
         break;
       case "ABDUCTING":
+        // Beam only appears in this state
         ufo.beamAlpha = Math.min(0.4, ufo.beamAlpha + 0.02);
         if (Math.abs(player.x - (ufo.x + ufo.size/2)) < 65 && !player.jumping) player.isBeingAbducted = true;
         if (!cow.abducted) {
@@ -134,29 +144,22 @@ function update() {
         } else if (ufo.timer > 120 && !player.isBeingAbducted) ufo.state = "OUTBOUND";
         break;
       case "OUTBOUND":
-        ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05);
+        ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05); // Fade beam out
         ufo.x -= 12; ufo.size -= 1;
         if (ufo.size <= 0) { ufo.state = "WAITING"; ufo.timer = 0; cow.y = treeY + 100; cow.abducted = false; }
         break;
     }
   } else {
-    // SPACE MODE
     spaceDistance += player.speed;
     if (keys.left) { player.x -= player.speed; player.dir = "left"; }
     if (keys.right) { player.x += player.speed; player.dir = "right"; }
     if (keys.jump) player.vy -= 1.0; 
-    
     player.vy += 0.3; 
     player.y += player.vy;
     player.vy *= 0.96;
-
     if (player.y < 0) { player.y = 0; player.vy = 0; }
     if (player.y > canvas.height) { player.y = canvas.height; player.vy = 0; }
-
-    // Exit Portal appears after 5000px
-    if (spaceDistance > 5000 && Math.abs(player.x - 4000) < 100) {
-        resetEarth();
-    }
+    if (spaceDistance > 5000 && Math.abs(player.x - 4000) < 100) resetEarth();
   }
   cameraX = player.x - canvas.width / 2;
 }
@@ -167,13 +170,25 @@ function draw() {
   if (gameState === "EARTH") {
     ctx.fillStyle = "#020a2a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
     stars.forEach(s => { ctx.font = "16px serif"; ctx.fillText(s.emoji, s.x - cameraX * 0.1, s.y); });
+    
+    // Ground layers
     ctx.fillStyle = "#2f7d32"; ctx.fillRect(-cameraX, treeY, worldWidth, GRASS_H);
     ctx.fillStyle = "#333"; ctx.fillRect(-cameraX, groundY + 20, worldWidth, ROAD_H);
+
+    // DRAW TREES FIRST (Background)
+    trees.forEach(t => {
+      ctx.font = t.size + "px serif";
+      ctx.fillText("🌲", t.x - cameraX, t.y);
+    });
+
+    // Buildings and Farm (Middle ground)
     ctx.font = "100px serif";
-    buildings.forEach(b => ctx.fillText(b.emoji, b.x - cameraX, treeY + 20));
+    buildings.forEach(b => ctx.fillText(b.emoji, b.x - cameraX, treeY + 30));
     farm.forEach(f => { if (!f.abducted) { ctx.font = f.h + "px serif"; ctx.fillText(f.emoji, f.x - cameraX, f.y); }});
 
+    // UFO Logic
     if (ufo.size > 0) {
+      // Beam only draws when alpha > 0 and NOT in inbound fly-in
       if (ufo.beamAlpha > 0) {
         const grad = ctx.createLinearGradient(0, ufo.y, 0, groundY + 100);
         grad.addColorStop(0, `rgba(0, 255, 255, ${ufo.beamAlpha})`);
@@ -204,7 +219,7 @@ function draw() {
     ctx.fillText("DIST TO PORTAL: " + Math.max(0, Math.floor(5000 - spaceDistance)) + "m", 20, 50);
   }
 
-  // PLAYER DRAWING & FLIP
+  // PLAYER DRAWING & FLIP (Foreground)
   const currentImg = (player.dir === "right") ? imgRight : imgLeft;
   if (currentImg.complete) {
     ctx.drawImage(currentImg, player.x - cameraX - 30, player.y - 60, 60, 60);
