@@ -2,45 +2,52 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Maximum Reality – Select & Launch</title>
+<title>MAXIMUM REALITY: Abduction</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; color: white; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: white; }
   canvas { display: block; }
   
-  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; overflow-y: auto; padding: 20px; }
-  #header-img { width: 300px; height: auto; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,255,255,0.5); }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; padding: 20px; text-align: center; }
+  
+  .title { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: #ff00ff; text-shadow: 0 0 10px #ff00ff, 0 0 20px #00ffff; }
+  .title span { color: #00ffff; }
+
+  #header-img { width: 280px; height: auto; margin-bottom: 20px; border: 2px solid #00ffff; border-radius: 10px; box-shadow: 0 0 15px #ff00ff; }
   
   .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 500px; }
-  .char-btn { background: #222; border: 2px solid #555; border-radius: 15px; padding: 10px; text-align: center; cursor: pointer; transition: 0.2s; }
-  .char-btn:hover { border-color: #0ff; background: #333; }
-  .char-btn img, .char-btn div { width: 60px; height: 60px; object-fit: contain; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 40px; }
-  .char-btn p { margin: 5px 0 0; font-size: 12px; }
+  .char-btn { background: #111; border: 2px solid #444; border-radius: 15px; padding: 10px; cursor: pointer; transition: 0.2s; }
+  .char-btn:hover { border-color: #0ff; transform: scale(1.05); }
+  .char-btn img, .char-btn div { width: 50px; height: 50px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+  .char-btn p { margin: 8px 0 0; font-size: 10px; text-transform: uppercase; color: #0ff; }
 
-  #controls { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 100; padding: 10px; display: none; }
-  button { font-size: 28px; padding: 12px 20px; border-radius: 12px; border: none; background: rgba(255,255,255,0.15); color: #fff; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3); touch-action: manipulation; width: 75px; height: 65px; }
+  #controls { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 100; }
+  button { font-size: 28px; padding: 12px 20px; border-radius: 12px; border: 1px solid rgba(0,255,255,0.5); background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); touch-action: manipulation; width: 75px; height: 65px; }
   
-  #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; }
+  #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; font-size: 18px; color: #0ff; text-shadow: 0 0 5px #000; }
 </style>
 </head>
 <body>
 
 <div id="overlay">
-  <img src="abduction.png" id="header-img" alt="Abduction">
-  <h2>SELECT CHARACTER</h2>
-  <div class="char-grid">
+  <div class="title">MAXIMUM <span>REALITY</span></div>
+  <p style="margin-top:-10px; color:#ff00ff; font-weight:bold;">ABDUCTION</p>
+  <img src="abduction.png" id="header-img">
+  <h3 id="overlay-msg">SELECT YOUR CHARACTER</h3>
+  <div class="char-grid" id="charGrid">
     <div class="char-btn" onclick="selectChar('lori')"><img src="lori.png"><p>Lori</p></div>
     <div class="char-btn" onclick="selectChar('man')"><div>🏃🏻‍♂️</div><p>Man</p></div>
     <div class="char-btn" onclick="selectChar('wc_man')"><div>🧎🏻‍♂️</div><p>Wheelchair M</p></div>
     <div class="char-btn" onclick="selectChar('woman')"><div>🧍🏼‍♀️</div><p>Woman</p></div>
-    <div class="char-btn" onclick="selectChar('wc_woman')"><div>🧎🏽‍♀️</div><p>Wheelchair W</p></div>
+    <div class="char-btn" onclick="selectChar('wc_woman')"><div>🪑</div><p>Wheelchair W</p></div>
   </div>
 </div>
 
 <div id="stats">
   <div>SCORE: <span id="scoreVal">0</span></div>
   <div id="fuelContainer" style="display:none;">
-    FUEL: <div style="width:100px; height:10px; background:#444; display:inline-block;"><div id="fuelBar" style="width:100%; height:100%; background:#0f0;"></div></div>
+    FUEL: <div style="width:100px; height:10px; background:#444; display:inline-block; border:1px solid #0ff;"><div id="fuelBar" style="width:100%; height:100%; background:#0f0;"></div></div>
   </div>
 </div>
 
@@ -62,10 +69,9 @@ let spaceDistance = 0;
 let score = 0;
 const worldWidth = 6000; 
 
-/* CHARACTER LOGIC */
 const characters = {
   lori:     { type: 'png', right: "IMG_2161.png", left: "IMG_2162.png" },
-  man:      { type: 'emoji', right: "🏃🏻‍♂️", left: "🏃🏻" },
+  man:      { type: 'emoji', right: "🏃🏻‍♂️‍➡️", left: "🏃🏻‍♂️" },
   wc_man:   { type: 'emoji', right: "👨🏻‍🦽‍➡️", left: "👨🏻‍🦽" },
   woman:    { type: 'emoji', right: "🏃🏼‍♀️‍➡️", left: "🏃🏼‍♀️" },
   wc_woman: { type: 'emoji', right: "👩🏽‍🦽‍➡️", left: "👩🏽‍🦽" }
@@ -83,10 +89,17 @@ function selectChar(key) {
   document.getElementById('overlay').style.display = 'none';
   document.getElementById('controls').style.display = 'flex';
   document.getElementById('stats').style.display = 'block';
+  resetGame();
   gameState = "EARTH";
 }
 
-/* PHYSICS & WORLD */
+function gameOver() {
+    gameState = "START";
+    document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('overlay-msg').innerText = "MISSION FAILED - OUT OF FUEL";
+    document.getElementById('overlay-msg').style.color = "#ff0000";
+}
+
 const ROAD_H = 120; const GRASS_H = 140;
 let groundY, treeY;
 
@@ -94,9 +107,8 @@ const player = { x: 300, y: 0, vy: 0, jumping: false, dir: "right", speed: 7, is
 const ufo = { state: "WAITING", x: 0, y: 100, size: 0, targetX: 4465, timer: 0, beamAlpha: 0 };
 const stars = Array.from({length: 100}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 400, emoji: "⭐" }));
 const buildings = Array.from({length: 12}, (_, i) => ({ x: i * 350, emoji: ["🏢", "🏬", "🏭", "🏨", "🏦"][i % 5] }));
-const trees = Array.from({length: 40}, (_, i) => ({ x: i * 150 }));
-const asteroids = Array.from({length: 20}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 600, emoji: "🪨" }));
-const fuelTanks = Array.from({length: 5}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 400, collected: false }));
+const fuelTanks = Array.from({length: 8}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 500, collected: false }));
+const asteroids = Array.from({length: 25}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 600, emoji: "🪨" }));
 const farm = [{ emoji: "🏠", x: 4450, y: 0, h: 100 }, { emoji: "🐄", x: 4465, y: 0, h: 50, abducted: false }];
 
 function resize() {
@@ -106,6 +118,19 @@ function resize() {
 }
 window.addEventListener("resize", resize); resize();
 
+function resetGame() {
+  score = 0;
+  resetEarth();
+}
+
+function resetEarth() {
+  gameState = "EARTH"; player.isBeingAbducted = false; player.y = groundY; player.fuel = 100;
+  spaceDistance = 0; ufo.state = "WAITING"; ufo.timer = 0; ufo.size = 0;
+  farm[1].y = treeY + 100; farm[1].abducted = false;
+  fuelTanks.forEach(t => t.collected = false);
+  document.getElementById('fuelContainer').style.display = 'none';
+}
+
 let keys = { left: false, right: false, jump: false };
 function bind(id, k) {
   const btn = document.getElementById(id);
@@ -113,14 +138,6 @@ function bind(id, k) {
   btn.onmouseup = btn.ontouchend = btn.onmouseleave = (e) => { e.preventDefault(); keys[k] = false; };
 }
 bind("left", "left"); bind("right", "right"); bind("jump", "jump");
-
-function resetEarth() {
-  gameState = "EARTH"; player.isBeingAbducted = false; player.y = groundY; player.fuel = 100;
-  spaceDistance = 0; ufo.state = "WAITING"; ufo.timer = 0;
-  farm[1].y = treeY + 100; farm[1].abducted = false;
-  fuelTanks.forEach(t => t.collected = false);
-  document.getElementById('fuelContainer').style.display = 'none';
-}
 
 function update() {
   if (gameState === "START") return;
@@ -147,14 +164,18 @@ function update() {
     ufo.timer++;
     switch (ufo.state) {
       case "WAITING": if (ufo.timer > 300) { ufo.state = "INBOUND"; ufo.x = player.x + 800; ufo.size = 50; } break;
-      case "INBOUND": ufo.x -= 7; ufo.size = Math.min(115, ufo.size + 1); if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING"; break;
+      case "INBOUND": 
+        ufo.x -= 4; // SLOWED DOWN (Enjoy the visuals)
+        ufo.size = Math.min(115, ufo.size + 0.5); 
+        if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING"; 
+        break;
       case "ABDUCTING":
         ufo.beamAlpha = Math.min(0.4, ufo.beamAlpha + 0.02);
         if (Math.abs(player.x - (ufo.x + ufo.size/2)) < 65 && !player.jumping) player.isBeingAbducted = true;
         if (!farm[1].abducted) { farm[1].y -= 2; if (farm[1].y < ufo.y + 40) { farm[1].abducted = true; ufo.timer = 0; score += 10; }
         } else if (ufo.timer > 120 && !player.isBeingAbducted) ufo.state = "OUTBOUND";
         break;
-      case "OUTBOUND": ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05); ufo.x -= 10; ufo.size -= 1; if (ufo.size <= 0) ufo.state = "WAITING"; break;
+      case "OUTBOUND": ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05); ufo.x -= 6; ufo.size -= 0.5; if (ufo.size <= 0) ufo.state = "WAITING"; break;
     }
   } else {
     // SPACE
@@ -162,9 +183,13 @@ function update() {
     if (keys.left) { player.x -= player.speed; player.dir = "left"; }
     if (keys.right) { player.x += player.speed; player.dir = "right"; }
     if (player.x < 0) player.x = worldWidth; if (player.x > worldWidth) player.x = 0;
-    if (keys.jump && player.fuel > 0) { player.vy -= 1.0; player.fuel -= 0.5; }
+    
+    if (keys.jump && player.fuel > 0) { player.vy -= 1.0; player.fuel -= 0.4; }
     player.vy += 0.3; player.y += player.vy; player.vy *= 0.96;
     document.getElementById('fuelBar').style.width = player.fuel + '%';
+
+    // Game Over Check
+    if (player.fuel <= 0 && player.y >= canvas.height - 10) gameOver();
 
     fuelTanks.forEach(t => {
       if (!t.collected && Math.abs((player.x % worldWidth) - t.x) < 40 && Math.abs(player.y - t.y) < 40) {
@@ -178,7 +203,7 @@ function update() {
         if (Math.sqrt(dx*dx + dy*dy) < 40 && player.collisionTimer === 0) { player.collisionTimer = 30; player.vy = 8; score = Math.max(0, score - 5); }
     });
     if (player.y > canvas.height) player.y = canvas.height;
-    if (spaceDistance > 5000 && Math.abs((player.x % worldWidth) - 1000) < 100) { resetEarth(); score += 100; }
+    if (spaceDistance > 5000 && Math.abs((player.x % worldWidth) - 1000) < 150) { resetEarth(); score += 100; }
   }
   cameraX = player.x - canvas.width / 2;
 }
@@ -195,14 +220,14 @@ function draw() {
       stars.forEach(s => { ctx.font = "16px serif"; ctx.fillText(s.emoji, s.x + off - cameraX * 0.1, s.y); });
       ctx.fillStyle = "#2f7d32"; ctx.fillRect(off - cameraX, treeY, worldWidth, GRASS_H);
       ctx.fillStyle = "#333"; ctx.fillRect(off - cameraX, groundY + 20, worldWidth, ROAD_H);
-      trees.forEach((t, i) => { ctx.font = "70px serif"; ctx.fillText("🌲", (i*150) + off - cameraX, treeY + 30); });
+      for(let i=0; i<40; i++) { ctx.font = "70px serif"; ctx.fillText("🌲", (i*150) + off - cameraX, treeY + 30); }
       buildings.forEach(b => { ctx.font = "100px serif"; ctx.fillText(b.emoji, b.x + off - cameraX, treeY + 30); });
       farm.forEach(f => { if (!f.abducted) { ctx.font = f.h + "px serif"; ctx.fillText(f.emoji, f.x + off - cameraX, f.y); } });
     });
 
-    if (ufo.size > 0) {
+    if (ufo.size > 1) {
       if (ufo.beamAlpha > 0 && ufo.state === "ABDUCTING") {
-        ctx.save(); // Isolation block
+        ctx.save();
         const grad = ctx.createLinearGradient(0, ufo.y, 0, groundY + 100);
         grad.addColorStop(0, `rgba(0, 255, 255, ${ufo.beamAlpha})`);
         grad.addColorStop(1, "rgba(0, 255, 255, 0)");
@@ -211,7 +236,7 @@ function draw() {
         ctx.lineTo(ufo.x - cameraX - 60, groundY + 100);
         ctx.lineTo(ufo.x - cameraX + ufo.size + 60, groundY + 100);
         ctx.fill();
-        ctx.restore(); // Restore global state
+        ctx.restore();
       }
       ctx.font = ufo.size + "px serif";
       ctx.fillText("🛸", ufo.x - cameraX, ufo.y + (ufo.size/2));
@@ -230,7 +255,7 @@ function draw() {
     if (spaceDistance > 4000) { ctx.font = "120px serif"; ctx.fillText("🌀", 1000 - (cameraX % worldWidth), canvas.height/2); }
   }
 
-  // PLAYER (Drawn after beam to ensure no ghosting)
+  // PLAYER
   if (selectedChar.type === 'png') {
     const img = (player.dir === "right") ? imgRight : imgLeft;
     if (img.complete) ctx.drawImage(img, player.x - cameraX - 30, player.y - 60, 60, 60);
