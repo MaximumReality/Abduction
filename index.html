@@ -8,29 +8,39 @@
   html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; color: white; }
   canvas { display: block; }
   
-  /* Start Screen Overlay */
-  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; }
-  .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 20px; }
-  .char-btn { background: #222; border: 2px solid #555; border-radius: 15px; padding: 15px; text-align: center; cursor: pointer; transition: 0.2s; }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; overflow-y: auto; padding: 20px; }
+  #header-img { width: 300px; height: auto; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,255,255,0.5); }
+  
+  .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 500px; }
+  .char-btn { background: #222; border: 2px solid #555; border-radius: 15px; padding: 10px; text-align: center; cursor: pointer; transition: 0.2s; }
   .char-btn:hover { border-color: #0ff; background: #333; }
-  .char-btn div { font-size: 40px; }
-  .char-btn p { margin: 5px 0 0; font-size: 14px; }
+  .char-btn img, .char-btn div { width: 60px; height: 60px; object-fit: contain; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+  .char-btn p { margin: 5px 0 0; font-size: 12px; }
 
-  /* Game Controls */
   #controls { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 100; padding: 10px; display: none; }
   button { font-size: 28px; padding: 12px 20px; border-radius: 12px; border: none; background: rgba(255,255,255,0.15); color: #fff; backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.3); touch-action: manipulation; width: 75px; height: 65px; }
+  
+  #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; }
 </style>
 </head>
 <body>
 
 <div id="overlay">
-  <h1>CHOOSE YOUR CHARACTER</h1>
+  <img src="abduction.png" id="header-img" alt="Abduction">
+  <h2>SELECT CHARACTER</h2>
   <div class="char-grid">
-    <div class="char-btn" onclick="selectChar('lori')"><div>🖼️</div><p>Lori (PNG)</p></div>
-    <div class="char-btn" onclick="selectChar('man')"><div>🧍🏻</div><p>Man</p></div>
+    <div class="char-btn" onclick="selectChar('lori')"><img src="lori.png"><p>Lori</p></div>
+    <div class="char-btn" onclick="selectChar('man')"><div>🏃🏻‍♂️</div><p>Man</p></div>
     <div class="char-btn" onclick="selectChar('wc_man')"><div>🧎🏻‍♂️</div><p>Wheelchair M</p></div>
     <div class="char-btn" onclick="selectChar('woman')"><div>🧍🏼‍♀️</div><p>Woman</p></div>
     <div class="char-btn" onclick="selectChar('wc_woman')"><div>🧎🏽‍♀️</div><p>Wheelchair W</p></div>
+  </div>
+</div>
+
+<div id="stats">
+  <div>SCORE: <span id="scoreVal">0</span></div>
+  <div id="fuelContainer" style="display:none;">
+    FUEL: <div style="width:100px; height:10px; background:#444; display:inline-block;"><div id="fuelBar" style="width:100%; height:100%; background:#0f0;"></div></div>
   </div>
 </div>
 
@@ -46,12 +56,13 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-let gameState = "START"; // START, EARTH, SPACE
+let gameState = "START"; 
 let cameraX = 0;
 let spaceDistance = 0; 
+let score = 0;
 const worldWidth = 6000; 
 
-/* CHARACTER DATA */
+/* CHARACTER LOGIC */
 const characters = {
   lori:     { type: 'png', right: "IMG_2161.png", left: "IMG_2162.png" },
   man:      { type: 'emoji', right: "🏃🏻‍♂️", left: "🏃🏻" },
@@ -60,7 +71,6 @@ const characters = {
   wc_woman: { type: 'emoji', right: "👩🏽‍🦽‍➡️", left: "👩🏽‍🦽" }
 };
 let selectedChar = null;
-
 const imgRight = new Image();
 const imgLeft = new Image();
 
@@ -72,47 +82,30 @@ function selectChar(key) {
   }
   document.getElementById('overlay').style.display = 'none';
   document.getElementById('controls').style.display = 'flex';
+  document.getElementById('stats').style.display = 'block';
   gameState = "EARTH";
 }
 
 /* PHYSICS & WORLD */
-const ROAD_H = 120; 
-const GRASS_H = 140;
+const ROAD_H = 120; const GRASS_H = 140;
 let groundY, treeY;
 
-const player = {
-  x: 300, y: 0, vy: 0,
-  jumping: false, dir: "right", speed: 7,
-  isBeingAbducted: false, collisionTimer: 0,
-  fuel: 100
-};
-
+const player = { x: 300, y: 0, vy: 0, jumping: false, dir: "right", speed: 7, isBeingAbducted: false, collisionTimer: 0, fuel: 100 };
 const ufo = { state: "WAITING", x: 0, y: 100, size: 0, targetX: 4465, timer: 0, beamAlpha: 0 };
-
 const stars = Array.from({length: 100}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 400, emoji: "⭐" }));
 const buildings = Array.from({length: 12}, (_, i) => ({ x: i * 350, emoji: ["🏢", "🏬", "🏭", "🏨", "🏦"][i % 5] }));
-const trees = Array.from({length: 40}, (_, i) => ({ x: i * 150, size: 70 }));
+const trees = Array.from({length: 40}, (_, i) => ({ x: i * 150 }));
 const asteroids = Array.from({length: 20}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 600, emoji: "🪨" }));
 const fuelTanks = Array.from({length: 5}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 400, collected: false }));
-
-const farm = [
-  { emoji: "🏠", x: 4450, y: 0, h: 100 },
-  { emoji: "🐄", x: 4465, y: 0, h: 50, abducted: false }
-];
+const farm = [{ emoji: "🏠", x: 4450, y: 0, h: 100 }, { emoji: "🐄", x: 4465, y: 0, h: 50, abducted: false }];
 
 function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  groundY = canvas.height - ROAD_H - 50;
-  treeY = canvas.height - ROAD_H - GRASS_H;
-  player.y = groundY;
-  farm[0].y = treeY + 10;
-  farm[1].y = treeY + 100;
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  groundY = canvas.height - ROAD_H - 50; treeY = canvas.height - ROAD_H - GRASS_H;
+  player.y = groundY; farm[0].y = treeY + 10; farm[1].y = treeY + 100;
 }
-window.addEventListener("resize", resize);
-resize();
+window.addEventListener("resize", resize); resize();
 
-/* INPUT */
 let keys = { left: false, right: false, jump: false };
 function bind(id, k) {
   const btn = document.getElementById(id);
@@ -122,90 +115,70 @@ function bind(id, k) {
 bind("left", "left"); bind("right", "right"); bind("jump", "jump");
 
 function resetEarth() {
-  gameState = "EARTH";
-  player.isBeingAbducted = false;
-  player.y = groundY;
-  player.fuel = 100;
-  spaceDistance = 0;
-  ufo.state = "WAITING";
-  ufo.timer = 0;
-  farm[1].y = treeY + 100;
-  farm[1].abducted = false;
+  gameState = "EARTH"; player.isBeingAbducted = false; player.y = groundY; player.fuel = 100;
+  spaceDistance = 0; ufo.state = "WAITING"; ufo.timer = 0;
+  farm[1].y = treeY + 100; farm[1].abducted = false;
   fuelTanks.forEach(t => t.collected = false);
+  document.getElementById('fuelContainer').style.display = 'none';
 }
 
 function update() {
   if (gameState === "START") return;
+  document.getElementById('scoreVal').innerText = score;
 
   if (gameState === "EARTH") {
     if (keys.left && !player.isBeingAbducted) { player.x -= player.speed; player.dir = "left"; }
     if (keys.right && !player.isBeingAbducted) { player.x += player.speed; player.dir = "right"; }
-    if (player.x < 0) player.x = worldWidth;
-    if (player.x > worldWidth) player.x = 0;
+    if (player.x < 0) player.x = worldWidth; if (player.x > worldWidth) player.x = 0;
 
     if (player.isBeingAbducted) {
       player.x += (ufo.x + (ufo.size/2) - player.x - 30) * 0.1;
       player.y -= 3;
-      if (player.y < ufo.y + 20) gameState = "SPACE";
+      if (player.y < ufo.y + 20) { 
+          gameState = "SPACE"; score += 50; 
+          document.getElementById('fuelContainer').style.display = 'block';
+      }
     } else {
       if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
-      player.vy += 0.8;
-      player.y += player.vy;
+      player.vy += 0.8; player.y += player.vy;
       if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
     }
 
     ufo.timer++;
     switch (ufo.state) {
       case "WAITING": if (ufo.timer > 300) { ufo.state = "INBOUND"; ufo.x = player.x + 800; ufo.size = 50; } break;
-      case "INBOUND":
-        ufo.x -= 7; ufo.size = Math.min(115, ufo.size + 1);
-        if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING";
-        break;
+      case "INBOUND": ufo.x -= 7; ufo.size = Math.min(115, ufo.size + 1); if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING"; break;
       case "ABDUCTING":
         ufo.beamAlpha = Math.min(0.4, ufo.beamAlpha + 0.02);
         if (Math.abs(player.x - (ufo.x + ufo.size/2)) < 65 && !player.jumping) player.isBeingAbducted = true;
-        if (!farm[1].abducted) {
-            farm[1].y -= 2;
-            if (farm[1].y < ufo.y + 40) { farm[1].abducted = true; ufo.timer = 0; }
+        if (!farm[1].abducted) { farm[1].y -= 2; if (farm[1].y < ufo.y + 40) { farm[1].abducted = true; ufo.timer = 0; score += 10; }
         } else if (ufo.timer > 120 && !player.isBeingAbducted) ufo.state = "OUTBOUND";
         break;
-      case "OUTBOUND":
-        ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05);
-        ufo.x -= 10; ufo.size -= 1;
-        if (ufo.size <= 0) resetEarth();
-        break;
+      case "OUTBOUND": ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05); ufo.x -= 10; ufo.size -= 1; if (ufo.size <= 0) ufo.state = "WAITING"; break;
     }
   } else {
-    // SPACE MODE
+    // SPACE
     spaceDistance += player.speed;
     if (keys.left) { player.x -= player.speed; player.dir = "left"; }
     if (keys.right) { player.x += player.speed; player.dir = "right"; }
-    if (player.x < 0) player.x = worldWidth;
-    if (player.x > worldWidth) player.x = 0;
-
+    if (player.x < 0) player.x = worldWidth; if (player.x > worldWidth) player.x = 0;
     if (keys.jump && player.fuel > 0) { player.vy -= 1.0; player.fuel -= 0.5; }
-    player.vy += 0.3; player.y += player.vy;
-    player.vy *= 0.96;
+    player.vy += 0.3; player.y += player.vy; player.vy *= 0.96;
+    document.getElementById('fuelBar').style.width = player.fuel + '%';
 
-    // Fuel Collection
     fuelTanks.forEach(t => {
       if (!t.collected && Math.abs((player.x % worldWidth) - t.x) < 40 && Math.abs(player.y - t.y) < 40) {
-        t.collected = true; player.fuel = Math.min(100, player.fuel + 30);
+        t.collected = true; player.fuel = Math.min(100, player.fuel + 40); score += 5;
       }
     });
 
-    // Collision
     if (player.collisionTimer > 0) player.collisionTimer--;
     asteroids.forEach(a => {
-        let dx = (player.x % worldWidth) - a.x;
-        let dy = player.y - a.y;
-        if (Math.sqrt(dx*dx + dy*dy) < 40 && player.collisionTimer === 0) {
-            player.collisionTimer = 30; player.vy = 8;
-        }
+        let dx = (player.x % worldWidth) - a.x; let dy = player.y - a.y;
+        if (Math.sqrt(dx*dx + dy*dy) < 40 && player.collisionTimer === 0) { player.collisionTimer = 30; player.vy = 8; score = Math.max(0, score - 5); }
     });
-
     if (player.y > canvas.height) player.y = canvas.height;
-    if (spaceDistance > 5000 && Math.abs((player.x % worldWidth) - 1000) < 100) resetEarth();
+    if (spaceDistance > 5000 && Math.abs((player.x % worldWidth) - 1000) < 100) { resetEarth(); score += 100; }
   }
   cameraX = player.x - canvas.width / 2;
 }
@@ -229,6 +202,7 @@ function draw() {
 
     if (ufo.size > 0) {
       if (ufo.beamAlpha > 0 && ufo.state === "ABDUCTING") {
+        ctx.save(); // Isolation block
         const grad = ctx.createLinearGradient(0, ufo.y, 0, groundY + 100);
         grad.addColorStop(0, `rgba(0, 255, 255, ${ufo.beamAlpha})`);
         grad.addColorStop(1, "rgba(0, 255, 255, 0)");
@@ -237,6 +211,7 @@ function draw() {
         ctx.lineTo(ufo.x - cameraX - 60, groundY + 100);
         ctx.lineTo(ufo.x - cameraX + ufo.size + 60, groundY + 100);
         ctx.fill();
+        ctx.restore(); // Restore global state
       }
       ctx.font = ufo.size + "px serif";
       ctx.fillText("🛸", ufo.x - cameraX, ufo.y + (ufo.size/2));
@@ -253,14 +228,9 @@ function draw() {
         fuelTanks.forEach(f => { if(!f.collected) { ctx.font = "30px serif"; ctx.fillText("🔋", f.x + off - cameraX, f.y); } });
     }
     if (spaceDistance > 4000) { ctx.font = "120px serif"; ctx.fillText("🌀", 1000 - (cameraX % worldWidth), canvas.height/2); }
-    
-    // Fuel Bar
-    ctx.fillStyle = "white"; ctx.fillText("FUEL", 20, 40);
-    ctx.fillStyle = "#444"; ctx.fillRect(20, 50, 100, 10);
-    ctx.fillStyle = player.fuel > 30 ? "#0f0" : "#f00"; ctx.fillRect(20, 50, player.fuel, 10);
   }
 
-  // PLAYER
+  // PLAYER (Drawn after beam to ensure no ghosting)
   if (selectedChar.type === 'png') {
     const img = (player.dir === "right") ? imgRight : imgLeft;
     if (img.complete) ctx.drawImage(img, player.x - cameraX - 30, player.y - 60, 60, 60);
