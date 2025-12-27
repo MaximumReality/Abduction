@@ -2,13 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Maximum Reality – Night Run</title>
+<title>Maximum Reality – Space Bound</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: #020a2a; font-family: sans-serif; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
   #controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; z-index: 10; }
-  button { font-size: 30px; padding: 15px 25px; border-radius: 15px; border: none; background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); }
-  button:active { background: rgba(255,255,255,0.3); }
+  button { font-size: 30px; padding: 15px 25px; border-radius: 15px; border: none; background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); border: 1px solid rgba(255,255,255,0.2); outline: none; }
 </style>
 </head>
 <body>
@@ -25,6 +24,10 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
+let gameState = "EARTH"; // EARTH or SPACE
+let cameraX = 0;
+let worldWidth = 8000;
+
 function resize() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -32,68 +35,36 @@ function resize() {
 resize();
 window.addEventListener("resize", resize);
 
-/* WORLD CONSTANTS */
+/* PHYSICS CONSTANTS */
 const ROAD_H = 80;
 const GRASS_H = 120;
-const WORLD_WIDTH = 8000;
-const groundY = canvas.height - ROAD_H - 18;
-const treeY = canvas.height - ROAD_H - GRASS_H;
+let groundY = canvas.height - ROAD_H - 18;
+let treeY = canvas.height - ROAD_H - GRASS_H;
 
 /* PLAYER */
 const player = {
-  x: 300,
-  y: groundY,
-  vy: 0,
-  jumping: false,
-  dir: "right",
-  speed: 6,
-  pngRight: "IMG_2161.png",
-  pngLeft: "IMG_2162.png"
+  x: 300, y: groundY, vy: 0,
+  jumping: false, dir: "right", speed: 6,
+  isBeingAbducted: false,
+  pngRight: "IMG_2161.png", pngLeft: "IMG_2162.png"
 };
 const imgRight = new Image(); imgRight.src = player.pngRight;
 const imgLeft = new Image(); imgLeft.src = player.pngLeft;
 
-/* CAMERA */
-let cameraX = 0;
-
-/* UFO LOGIC */
+/* UFO */
 const ufo = {
-  state: "WAITING", // WAITING, INBOUND, ABDUCTING, OUTBOUND
-  x: 0,
-  y: 100,
-  size: 0,
-  targetX: 4465, 
-  timer: 0,
-  beamAlpha: 0
+  state: "WAITING", 
+  x: 0, y: 100, size: 0,
+  targetX: 4465, timer: 0, beamAlpha: 0
 };
 
 /* WORLD OBJECTS */
-const stars = [];
-for (let i = 0; i < 200; i++) {
-  stars.push({ x: Math.random() * WORLD_WIDTH, y: Math.random() * 300, emoji: ["⭐️", "✨", "🌟"][i % 3] });
-}
-
-const clouds = [];
-for (let i = 0; i < 15; i++) {
-  clouds.push({ x: i * 600, y: 50 + Math.random() * 100 });
-}
-
-const buildings = [];
-for (let i = 0; i < 15; i++) {
-  buildings.push({ x: i * 250, emoji: ["🏢", "🏬", "🏭", "🏨", "🏦"][i % 5], y: treeY + 20 });
-}
-
-const trees = [];
-for (let i = 0; i < 60; i++) {
-  trees.push({ x: i * 140, y: treeY + 30, emoji: "🌲", size: 70 });
-}
-
+const stars = Array.from({length: 200}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 400, emoji: ["⭐", "✨"][Math.floor(Math.random()*2)] }));
+const asteroids = Array.from({length: 20}, () => ({ x: Math.random() * worldWidth, y: Math.random() * canvas.height, size: 40 + Math.random()*40 }));
+const buildings = Array.from({length: 15}, (_, i) => ({ x: i * 300, emoji: ["🏢", "🏬", "🏭"][i % 3] }));
 const farm = [
   { emoji: "🏠", x: 4450, y: treeY + 10, h: 100 },
-  { emoji: "🚜", x: 4400, y: treeY + 50, h: 60 },
-  { emoji: "🐄", x: 4465, y: treeY + 100, h: 50, abducted: false },
-  { emoji: "🐓", x: 4430, y: treeY + 90, h: 20 },
-  { emoji: "🐖", x: 4480, y: treeY + 85, h: 25 }
+  { emoji: "🐄", x: 4465, y: treeY + 100, h: 50, abducted: false }
 ];
 
 /* INPUT */
@@ -108,145 +79,132 @@ function bind(id, k) {
 bind("left", "left"); bind("right", "right"); bind("jump", "jump");
 
 function update() {
-  // Player Movement
-  if (keys.left) { player.x -= player.speed; player.dir = "left"; }
-  if (keys.right) { player.x += player.speed; player.dir = "right"; }
-  if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
-  
-  player.vy += 0.8;
-  player.y += player.vy;
-  if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
-
-  // Camera constraints
-  cameraX = player.x - canvas.width / 2;
-
-  // UFO State Machine
   const cow = farm.find(f => f.emoji === "🐄");
-  ufo.timer++;
 
-  switch (ufo.state) {
-    case "WAITING":
-      if (ufo.timer > 300) { // Reset loop every ~5 seconds
-        ufo.state = "INBOUND";
-        ufo.x = player.x + 1200; // Start off-screen
-        ufo.y = 50;
-        ufo.size = 5;
-      }
-      break;
+  if (gameState === "EARTH") {
+    // Normal Gravity Movement
+    if (keys.left && !player.isBeingAbducted) { player.x -= player.speed; player.dir = "left"; }
+    if (keys.right && !player.isBeingAbducted) { player.x += player.speed; player.dir = "right"; }
+    
+    if (player.isBeingAbducted) {
+      player.x += (ufo.x + (ufo.size/4) - player.x) * 0.1; // Smoothly center player
+      player.y -= 3;
+      if (player.y < ufo.y + 40) gameState = "SPACE"; // Transition trigger
+    } else {
+      if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
+      player.vy += 0.8;
+      player.y += player.vy;
+      if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
+    }
 
-    case "INBOUND":
-      ufo.x -= 6;
-      ufo.size = Math.min(90, ufo.size + 0.6);
-      ufo.y = 120 + Math.sin(ufo.timer / 15) * 20;
-      if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING";
-      break;
-
-    case "ABDUCTING":
-      ufo.y = 120 + Math.sin(ufo.timer / 15) * 5;
-      // Beam effect
-      ufo.beamAlpha = Math.min(0.4, ufo.beamAlpha + 0.02);
-      
-      if (!cow.abducted) {
-        if (cow.y > ufo.y + 20) {
-          cow.y -= 2; 
-        } else {
-          cow.abducted = true;
-          ufo.timer = 0;
+    // UFO State Logic
+    ufo.timer++;
+    switch (ufo.state) {
+      case "WAITING":
+        if (ufo.timer > 300) { ufo.state = "INBOUND"; ufo.x = player.x + 1000; ufo.size = 5; }
+        break;
+      case "INBOUND":
+        ufo.x -= 5; ufo.size = Math.min(90, ufo.size + 0.6);
+        ufo.y = 120 + Math.sin(ufo.timer / 15) * 15;
+        if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING";
+        break;
+      case "ABDUCTING":
+        ufo.beamAlpha = Math.min(0.4, ufo.beamAlpha + 0.02);
+        // Check if player enters beam
+        if (Math.abs(player.x - (ufo.x + ufo.size/2)) < 40 && player.y >= groundY - 50) {
+          player.isBeingAbducted = true;
         }
-      } else if (ufo.timer > 60) { // Wait a second then leave
-        ufo.state = "OUTBOUND";
-      }
-      break;
-
-    case "OUTBOUND":
-      ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05);
-      ufo.x -= 8; // Fly off to the left
-      ufo.y -= 3;
-      ufo.size = Math.max(0, ufo.size - 0.7);
-      if (ufo.size <= 0) {
-        ufo.state = "WAITING";
-        ufo.timer = 0;
-        cow.y = treeY + 100; // Reset cow
-        cow.abducted = false;
-      }
-      break;
+        if (!cow.abducted) {
+          cow.y -= 2;
+          if (cow.y < ufo.y + 30) { cow.abducted = true; ufo.timer = 0; }
+        } else if (ufo.timer > 100 && !player.isBeingAbducted) {
+          ufo.state = "OUTBOUND";
+        }
+        break;
+      case "OUTBOUND":
+        ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05);
+        ufo.x -= 7; ufo.size -= 0.5;
+        if (ufo.size <= 0) { ufo.state = "WAITING"; ufo.timer = 0; cow.y = treeY + 100; cow.abducted = false; }
+        break;
+    }
+  } else {
+    // SPACE MODE: Zero Gravity / Thrusters
+    if (keys.left) player.x -= player.speed;
+    if (keys.right) player.x += player.speed;
+    if (keys.jump) player.vy -= 0.5; // Upward thrust
+    
+    player.vy += 0.15; // Weak space gravity
+    player.y += player.vy;
+    
+    // Bounds check for space
+    if (player.y < 0) player.y = 0;
+    if (player.y > canvas.height) player.y = canvas.height;
   }
+
+  cameraX = player.x - canvas.width / 2;
 }
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Background
-  ctx.fillStyle = "#020a2a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (gameState === "EARTH") {
+    // Sky
+    ctx.fillStyle = "#020a2a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    stars.forEach(s => { ctx.font = "16px serif"; ctx.fillText(s.emoji, s.x - cameraX * 0.1, s.y); });
+    
+    // Ground
+    ctx.fillStyle = "#2f7d32"; ctx.fillRect(-cameraX, treeY, worldWidth, GRASS_H);
+    ctx.fillStyle = "#444"; ctx.fillRect(-cameraX, groundY + 10, worldWidth, ROAD_H);
 
-  // Parallax Stars
-  ctx.font = "16px sans-serif";
-  stars.forEach(s => ctx.fillText(s.emoji, s.x - cameraX * 0.1, s.y));
+    // City & Farm
+    ctx.font = "100px serif";
+    buildings.forEach(b => ctx.fillText(b.emoji, b.x - cameraX, treeY + 20));
+    farm.forEach(f => {
+      if (!f.abducted) { ctx.font = f.h + "px serif"; ctx.fillText(f.emoji, f.x - cameraX, f.y); }
+    });
 
-  // Parallax Clouds
-  ctx.font = "50px sans-serif";
-  clouds.forEach(c => ctx.fillText("☁️", c.x - cameraX * 0.3, c.y));
-
-  // Moon
-  ctx.font = "80px sans-serif";
-  ctx.fillText("🌖", 200 - cameraX * 0.05, 120);
-
-  // Static Terrain (moves with camera)
-  ctx.fillStyle = "#2f7d32"; 
-  ctx.fillRect(-cameraX, treeY, WORLD_WIDTH, GRASS_H);
-  ctx.fillStyle = "#444"; 
-  ctx.fillRect(-cameraX, groundY + 10, WORLD_WIDTH, ROAD_H);
-
-  // Assets
-  ctx.font = "100px sans-serif";
-  buildings.forEach(b => ctx.fillText(b.emoji, b.x - cameraX, b.y));
-  
-  trees.forEach(t => {
-    ctx.font = t.size + "px sans-serif";
-    ctx.fillText(t.emoji, t.x - cameraX, t.y);
-  });
-
-  // Farm Scene
-  farm.forEach(f => {
-    if (!f.abducted) {
-      ctx.font = f.h + "px sans-serif";
-      ctx.fillText(f.emoji, f.x - cameraX, f.y);
+    // UFO - DRAW BEAM FIRST
+    if (ufo.size > 0) {
+      if (ufo.beamAlpha > 0) {
+        ctx.save();
+        const grad = ctx.createLinearGradient(0, ufo.y, 0, groundY + 50);
+        grad.addColorStop(0, `rgba(0, 255, 255, ${ufo.beamAlpha})`);
+        grad.addColorStop(1, "rgba(0, 255, 255, 0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(ufo.x - cameraX + ufo.size/2, ufo.y + ufo.size/2);
+        ctx.lineTo(ufo.x - cameraX - 50, groundY + 50);
+        ctx.lineTo(ufo.x - cameraX + ufo.size + 50, groundY + 50);
+        ctx.fill();
+        ctx.restore();
+      }
+      // Draw UFO Emoji separately so it's not affected by the beam style
+      ctx.font = ufo.size + "px serif";
+      ctx.fillText("🛸", ufo.x - cameraX, ufo.y + (ufo.size/2));
     }
-  });
-
-  // UFO & Tractor Beam
-  if (ufo.size > 0) {
-    if (ufo.state === "ABDUCTING" || ufo.beamAlpha > 0) {
-      const gradient = ctx.createLinearGradient(0, ufo.y, 0, groundY + 50);
-      gradient.addColorStop(0, `rgba(0, 255, 255, ${ufo.beamAlpha})`);
-      gradient.addColorStop(1, "rgba(0, 255, 255, 0)");
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.moveTo(ufo.x - cameraX + ufo.size/2, ufo.y);
-      ctx.lineTo(ufo.x - cameraX - 40, groundY + 50);
-      ctx.lineTo(ufo.x - cameraX + ufo.size + 40, groundY + 50);
-      ctx.fill();
-    }
-    ctx.font = ufo.size + "px sans-serif";
-    ctx.fillText("🛸", ufo.x - cameraX, ufo.y);
+  } else {
+    // SPACE DRAWING
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    stars.forEach(s => { ctx.font = "16px serif"; ctx.fillText(s.emoji, (s.x - cameraX) % canvas.width, s.y); });
+    ctx.font = "50px serif";
+    asteroids.forEach(a => ctx.fillText("🪨", a.x - cameraX * 0.5, a.y));
+    
+    ctx.fillStyle = "#0f0";
+    ctx.font = "20px sans-serif";
+    ctx.fillText("SPACE MODE: Use ⬆️ to Thrust!", 20, 40);
   }
 
-  // Player
+  // Player (Visible in both modes)
   const img = player.dir === "right" ? imgRight : imgLeft;
   if (img.complete) {
     ctx.drawImage(img, player.x - cameraX - 30, player.y - 60, 60, 60);
   } else {
-    // Fallback if images don't load
-    ctx.font = "50px sans-serif";
-    ctx.fillText(player.dir === "right" ? "🏃" : "🏃‍♂️", player.x - cameraX - 25, player.y);
+    ctx.font = "50px serif";
+    ctx.fillText("👨‍🚀", player.x - cameraX - 25, player.y);
   }
 }
 
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
+function loop() { update(); draw(); requestAnimationFrame(loop); }
 loop();
 </script>
 </body>
