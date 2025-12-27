@@ -63,54 +63,37 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-/* --- ROBUST AUDIO SYSTEM --- */
+/* --- AUDIO --- */
 let audioCtx = null, musicInterval = null, musicPlaying = false;
-
 function toggleMusic() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  
-  // Ensure AudioContext is running (solves browser "sleep" issue)
   if (audioCtx.state === 'suspended') audioCtx.resume();
-
   const btn = document.getElementById('musicToggle');
-  
   if (!musicPlaying) {
-    musicPlaying = true;
-    btn.innerText = "🔊";
-    
+    musicPlaying = true; btn.innerText = "🔊";
     const playSequence = () => {
       const t = audioCtx.currentTime;
-      // Notes: A, A, C, D
       const sequence = [{ f: 110, time: 0.0 }, { f: 110, time: 0.4 }, { f: 130, time: 0.8 }, { f: 146, time: 1.2 }];
-      
       sequence.forEach(note => {
-        const osc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(note.f, t + note.time);
-        
-        // Slightly louder, cleaner "thump"
+        const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(note.f, t + note.time);
         g.gain.setValueAtTime(0, t + note.time);
-        g.gain.linearRampToValueAtTime(0.04, t + note.time + 0.02);
+        g.gain.linearRampToValueAtTime(0.05, t + note.time + 0.02);
         g.gain.exponentialRampToValueAtTime(0.0001, t + note.time + 0.38);
-        
         osc.connect(g); g.connect(audioCtx.destination);
         osc.start(t + note.time); osc.stop(t + note.time + 0.4);
       });
     };
-    
-    playSequence();
-    musicInterval = setInterval(playSequence, 1600);
+    playSequence(); musicInterval = setInterval(playSequence, 1600);
   } else {
-    musicPlaying = false;
-    btn.innerText = "🔇";
+    musicPlaying = false; btn.innerText = "🔇";
     if (musicInterval) clearInterval(musicInterval);
   }
 }
 
-/* --- GAME STATE & VARS --- */
+/* --- GAME STATE --- */
 let gameState = "START", cameraX = 0, spaceDistance = 0, score = 0;
-const worldWidth = 6000; 
+const worldWidth = 6000;
 const characters = {
   lori:     { type: 'png', right: "IMG_2161.png", left: "IMG_2162.png" },
   man:      { type: 'emoji', right: "🏃🏻‍♂️‍➡️", left: "🏃🏻‍♂️" },
@@ -161,13 +144,15 @@ const farm = [{ emoji: "🏠", x: 4450, y: 0, h: 100 }, { emoji: "🐄", x: 4465
 function resize() {
   canvas.width = window.innerWidth; canvas.height = window.innerHeight;
   groundY = canvas.height - ROAD_H - 50; treeY = canvas.height - ROAD_H - GRASS_H;
+  // FIX THE HOUSE POSITION ON RESIZE
+  farm[0].y = treeY + 30;
 }
 window.addEventListener("resize", resize); resize();
 
 function resetEarth() {
   gameState = "EARTH"; player.isBeingAbducted = false; player.y = groundY; player.fuel = 100;
   spaceDistance = 0; ufo.state = "WAITING"; ufo.timer = 0; ufo.size = 0;
-  farm[1].y = treeY + 100; farm[1].abducted = false;
+  farm[1].y = treeY + 100; farm[1].abducted = false; farm[0].y = treeY + 30;
   fuelTanks.forEach(t => t.collected = false);
   document.getElementById('fuelContainer').style.display = 'none';
 }
