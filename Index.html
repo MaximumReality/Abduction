@@ -7,20 +7,30 @@
 <style>
   html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: white; }
   canvas { display: block; }
+  
+  /* Loading Overlay */
   #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; padding: 20px; text-align: center; }
+  
+  /* The Spinning Hourglass Animation */
+  .loader { font-size: 50px; animation: spin 2s linear infinite; margin-bottom: 20px; }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
   .title { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff, 0 0 20px #00ffff; }
   .title span { color: #00ffff; }
-  #header-img { width: 280px; height: auto; margin-bottom: 20px; border: 2px solid #00ffff; border-radius: 10px; box-shadow: 0 0 15px #ff00ff; }
+  
+  /* Hide character grid until assets are loaded */
+  #char-selection { display: none; flex-direction: column; align-items: center; }
+  
   .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 500px; }
   .char-btn { background: #111; border: 2px solid #444; border-radius: 15px; padding: 10px; cursor: pointer; transition: 0.2s; }
   .char-btn:hover { border-color: #0ff; transform: scale(1.05); }
   .char-btn img { width: 50px; height: 50px; margin: 0 auto; display: block; }
   .char-btn p { margin: 8px 0 0; font-size: 10px; text-transform: uppercase; color: #0ff; }
+  
   #controls { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 100; align-items: center; }
   button { font-size: 24px; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,255,255,0.5); background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); touch-action: manipulation; width: 65px; height: 60px; }
-  #restartBtn { background: rgba(255, 0, 255, 0.2); border-color: #ff00ff; }
   #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; font-size: 18px; color: #0ff; }
-  .home-btn { position: fixed; top: 16px; left: 16px; z-index: 2000; background: rgba(255, 0, 255, 0.8); color: #fff; padding: 8px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+  .home-btn { position: fixed; top: 16px; left: 16px; z-index: 2000; background: rgba(255, 0, 255, 0.8); color: #fff; padding: 8px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; text-decoration: none; }
 </style>
 </head>
 <body>
@@ -29,27 +39,29 @@
 
 <div id="overlay">
   <div class="title">MAXIMUM <span>REALITY</span></div>
-  <p style="margin-top:-10px; color:#ff00ff; font-weight:bold;">ABDUCTION</p>
-  <img src="abduction.png" id="header-img">
-  <h3 id="overlay-msg">SELECT YOUR CHARACTER</h3>
-  <div class="char-grid">
-    <div class="char-btn" onclick="selectChar('lori')"><img src="lori.png"><p>Lori</p></div>
-    <div class="char-btn" onclick="selectChar('azul')"><img src="azul_sitting.png"><p>Azul</p></div>
-    <div class="char-btn" onclick="selectChar('skater')"><img src="mochkil-skate.png"><p>Skater</p></div>
+  <div id="loading-zone">
+      <div class="loader">⏳</div>
+      <p id="load-text">CALIBRATING QUANTUM SENSORS...</p>
+  </div>
+  
+  <div id="char-selection">
+      <h3 style="color:#00ffff;">SELECT YOUR CHARACTER</h3>
+      <div class="char-grid">
+        <div class="char-btn" onclick="selectChar('lori')"><img src="lori.png"><p>Lori</p></div>
+        <div class="char-btn" onclick="selectChar('azul')"><img src="azul_sitting.png"><p>Azul</p></div>
+        <div class="char-btn" onclick="selectChar('skater')"><img src="mochkil-skate.png"><p>Skater</p></div>
+      </div>
   </div>
 </div>
 
-<div id="stats">
-  <div>SCORE: <span id="scoreVal">0</span></div>
-</div>
-
+<div id="stats">SCORE: <span id="scoreVal">0</span></div>
 <canvas id="game"></canvas>
 
 <div id="controls">
   <button id="left">⬅️</button>
   <button id="jump">⬆️</button>
   <button id="right">➡️</button>
-  <button id="restartBtn" onclick="returnToTitle()">🎬</button>
+  <button onclick="location.reload()">🎬</button>
 </div>
 
 <script>
@@ -61,44 +73,56 @@ const imgObj = {};
 const ASSETS_LIST = {
     sky: "gg-bg.png",
     floor: "floor.png",
-    buildingA: "building-a.png",
-    buildingB: "building-b.png",
     buildingC: "building-c.png",
-    bushes: "building-d.png",
     mochkilCaught: "Mochkil-caught.png",
     rick: "rickroll.png",
     loriRun: ["Lori-run.png", "Lori-run2.png", "Lori-run3.png"],
     azulRun: ["Azul-run.png", "Azul-run2.png", "Azul-run3.png"],
     spatula: "spatula.png",
-    whisk: "whisk.png",
     tank: "cardboard-tank.png",
-    pan: "frying-pan.png",
-    bowl: "bowl.png"
+    pan: "frying-pan.png"
 };
+
+let assetsLoaded = 0;
+const totalAssets = 13; // Total files including arrays
 
 function loadAssets() {
     for (let key in ASSETS_LIST) {
         if (Array.isArray(ASSETS_LIST[key])) {
             imgObj[key] = ASSETS_LIST[key].map(src => {
-                const img = new Image(); img.src = src; return img;
+                const img = new Image();
+                img.onload = checkAllLoaded;
+                img.src = src;
+                return img;
             });
         } else {
-            imgObj[key] = new Image(); imgObj[key].src = ASSETS_LIST[key];
+            imgObj[key] = new Image();
+            imgObj[key].onload = checkAllLoaded;
+            imgObj[key].src = ASSETS_LIST[key];
         }
     }
 }
+
+function checkAllLoaded() {
+    assetsLoaded++;
+    document.getElementById('load-text').innerText = `UPLOADING DATA: ${Math.floor((assetsLoaded/totalAssets)*100)}%`;
+    if (assetsLoaded >= totalAssets) {
+        document.getElementById('loading-zone').style.display = 'none';
+        document.getElementById('char-selection').style.display = 'flex';
+    }
+}
+
+// Start loading immediately
 loadAssets();
 
 // --- GAME STATE ---
 let gameState = "START", cameraX = 0, score = 0, frame = 0;
 let droppedTools = [];
-const TOOL_KEYS = ["spatula", "whisk", "pan", "bowl"];
 const player = { x: 300, y: 0, vy: 0, speed: 7, jumping: false, dir: "right", moving: false };
-const ufo = { state: "WAITING", x: 0, y: 100, size: 120, targetX: 4465, timer: 0, beamAlpha: 0 };
-const tank = { x: 1500, speed: 2, width: 220, height: 160 };
+const ufo = { state: "WAITING", x: 0, y: 100, timer: 0, beamAlpha: 0 };
+const tank = { x: 1500, speed: 2 };
 let selectedChar = null;
-const ROAD_H = 120;
-let groundY;
+let groundY = 0;
 
 function selectChar(key) {
     selectedChar = key;
@@ -111,7 +135,7 @@ function selectChar(key) {
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    groundY = canvas.height - ROAD_H - 50;
+    groundY = canvas.height - 170;
 }
 window.addEventListener("resize", resize); resize();
 
@@ -124,99 +148,57 @@ function bind(id, k) {
 }
 bind("left", "left"); bind("right", "right"); bind("jump", "jump");
 
-// --- UPDATES ---
 function update() {
     if (gameState === "START") return;
-
     if (keys.left) { player.x -= player.speed; player.dir = "left"; }
     if (keys.right) { player.x += player.speed; player.dir = "right"; }
-    
-    if (player.moving) frame = (frame + 0.1) % 3;
-    else frame = 0;
-
+    if (player.moving) frame = (frame + 0.1) % 3; else frame = 0;
     if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
     player.vy += 0.8; player.y += player.vy;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
     
-    updateUFO();
-    updateTank();
-    
-    cameraX = player.x - canvas.width / 2;
-    score = player.x / 10;
-    document.getElementById('scoreVal').innerText = Math.floor(score);
-}
-
-function updateUFO() {
+    // UFO Logic
     ufo.timer++;
-    if (ufo.state === "WAITING" && ufo.timer > 300) {
-        ufo.state = "INBOUND";
-        ufo.x = player.x + 1000;
-    }
-    if (ufo.state === "INBOUND") {
-        ufo.x -= 5;
-        if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING";
-    }
-    if (ufo.state === "ABDUCTING") {
-        ufo.beamAlpha = Math.min(0.5, ufo.beamAlpha + 0.02);
-        if (ufo.timer % 30 === 0) {
-            const toolKey = TOOL_KEYS[Math.floor(Math.random() * TOOL_KEYS.length)];
-            droppedTools.push({ imgKey: toolKey, x: ufo.x + 60, y: ufo.y + 50, vy: 2 + Math.random() * 3, rot: 0 });
-        }
-    }
-}
-
-function updateTank() {
+    if (ufo.state === "WAITING" && ufo.timer > 200) { ufo.state = "INBOUND"; ufo.x = player.x + 800; }
+    if (ufo.state === "INBOUND") { ufo.x -= 3; if (ufo.x < player.x + 100) ufo.state = "ABDUCTING"; }
+    
+    // Tank Logic
     tank.x += tank.speed;
-    if (tank.x > player.x + 2000) tank.x = player.x - 1000; 
+    if (tank.x > player.x + 1200) tank.x = player.x - 800;
+
+    cameraX = player.x - canvas.width / 2;
+    score = Math.floor(player.x / 10);
+    document.getElementById('scoreVal').innerText = score;
 }
 
-// --- DRAWING ---
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (gameState === "START") return;
 
-    // 1. Sky
+    // Sky & Buildings
     if (imgObj.sky.complete) ctx.drawImage(imgObj.sky, 0, 0, canvas.width, canvas.height);
-    
-    // 2. Far Buildings
     let bCX = -(cameraX * 0.1) % 800;
-    for(let i=0; i<10; i++) ctx.drawImage(imgObj.buildingC, bCX + (i*800), groundY - 400, 400, 500);
+    for(let i=0; i<5; i++) ctx.drawImage(imgObj.buildingC, bCX + (i*800), groundY - 300, 400, 400);
 
-    // 3. Rickroll Easter Egg
-    const rickX = 2500;
-    ctx.drawImage(imgObj.rick, rickX - cameraX, groundY - 20, 40, 40);
+    // Tank
+    ctx.drawImage(imgObj.tank, tank.x - cameraX, groundY - 60, 180, 120);
 
-    // 4. THE TANK (Drawn before floor)
-    ctx.drawImage(imgObj.tank, tank.x - cameraX, groundY - 80, tank.width, tank.height);
-
-    // 5. Floor
+    // Floor
     let fX = -cameraX % 128;
-    for (let i = -1; i < (canvas.width / 128) + 2; i++) ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY + 50, 128, 128);
+    for (let i = -1; i < (canvas.width / 128) + 2; i++) ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY + 40, 128, 128);
 
-    // 6. Kitchen Tools
-    droppedTools.forEach((t, i) => {
-        t.y += t.vy; t.rot += 0.1;
-        ctx.save();
-        ctx.translate(t.x - cameraX, t.y);
-        ctx.rotate(t.rot);
-        ctx.drawImage(imgObj[t.imgKey], -15, -15, 30, 30);
-        ctx.restore();
-        if (t.y > canvas.height) droppedTools.splice(i, 1);
-    });
-
-    // 7. Beam & UFO
+    // UFO & Beam
     if (ufo.state === "ABDUCTING") {
-        ctx.fillStyle = `rgba(0, 255, 255, ${ufo.beamAlpha})`;
-        ctx.beginPath(); ctx.moveTo(ufo.x - cameraX + 60, ufo.y + 60);
-        ctx.lineTo(ufo.x - cameraX - 40, groundY + 50); ctx.lineTo(ufo.x - cameraX + 160, groundY + 50);
-        ctx.fill();
-        ctx.drawImage(imgObj.mochkilCaught, ufo.x - cameraX + 30, groundY - (ufo.timer % 200), 60, 80);
+        ctx.fillStyle = "rgba(0, 255, 255, 0.3)";
+        ctx.fillRect(ufo.x - cameraX + 20, 150, 60, groundY - 100);
+        ctx.drawImage(imgObj.mochkilCaught, ufo.x - cameraX + 20, groundY - (ufo.timer % 150), 60, 80);
     }
-    ctx.font = "80px serif"; ctx.fillText("🛸", ufo.x - cameraX, ufo.y + 60);
+    ctx.font = "60px serif"; ctx.fillText("🛸", ufo.x - cameraX, 150);
 
-    // 8. Player
+    // Player
     let charKey = (selectedChar === 'lori') ? 'loriRun' : 'azulRun';
-    let currentImg = imgObj[charKey][Math.floor(frame)];
+    let currentImg = Array.isArray(imgObj[charKey]) ? imgObj[charKey][Math.floor(frame)] : imgObj[charKey];
+    
     ctx.save();
     if (player.dir === "left") { ctx.translate(player.x - cameraX + 30, 0); ctx.scale(-1, 1); ctx.drawImage(currentImg, -30, player.y - 60, 60, 60); }
     else { ctx.drawImage(currentImg, player.x - cameraX - 30, player.y - 60, 60, 60); }
@@ -225,7 +207,6 @@ function draw() {
 
 function loop() { update(); draw(); requestAnimationFrame(loop); }
 loop();
-function returnToTitle() { location.reload(); }
 </script>
 </body>
 </html>
