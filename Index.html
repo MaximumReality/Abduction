@@ -11,21 +11,16 @@
   .loader { font-size: 50px; animation: spin 2s linear infinite; margin-bottom: 20px; }
   @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
   .title { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff, 0 0 20px #00ffff; }
-  .title span { color: #00ffff; }
   #char-selection { display: none; flex-direction: column; align-items: center; }
-  .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 500px; }
+  .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
   .char-btn { background: #111; border: 2px solid #444; border-radius: 15px; padding: 10px; cursor: pointer; transition: 0.2s; }
   .char-btn:hover { border-color: #0ff; transform: scale(1.05); }
   .char-btn img { width: 60px; height: 60px; object-fit: contain; }
   #controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 100; }
-  button { font-size: 30px; padding: 10px; border-radius: 12px; border: 2px solid #0ff; background: rgba(0,255,255,0.1); color: #fff; backdrop-filter: blur(5px); width: 70px; height: 70px; touch-action: manipulation; }
-  #stats { position: fixed; top: 20px; right: 20px; font-size: 24px; color: #0ff; display: none; }
-  .home-btn { position: fixed; top: 16px; left: 16px; z-index: 2000; background: #ff00ff; color: #fff; padding: 8px 12px; border-radius: 12px; text-decoration: none; font-weight: bold; }
+  button { font-size: 30px; padding: 10px; border-radius: 12px; border: 2px solid #0ff; background: rgba(0,255,255,0.1); color: #fff; width: 70px; height: 70px; touch-action: manipulation; }
 </style>
 </head>
 <body>
-
-<a href="https://maximumreality.xyz/" class="home-btn">🏠 Home</a>
 
 <div id="overlay">
   <div class="title">MAXIMUM <span>REALITY</span></div>
@@ -33,7 +28,6 @@
       <div class="loader">⏳</div>
       <p id="load-text">UPLOADING FOLDER DATA...</p>
   </div>
-  
   <div id="char-selection">
       <h3 style="color:#00ffff; margin-bottom: 20px;">SELECT YOUR CHARACTER</h3>
       <div class="char-grid">
@@ -44,7 +38,7 @@
   </div>
 </div>
 
-<div id="stats">SCORE: <span id="scoreVal">0</span></div>
+<div id="stats" style="position:fixed; top:20px; right:20px; display:none; font-size:24px; color:#0ff;">SCORE: <span id="scoreVal">0</span></div>
 <canvas id="game"></canvas>
 
 <div id="controls">
@@ -58,7 +52,6 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// --- UPDATED ASSET LIST (MATCHING YOUR FOLDER) ---
 const ASSETS_LIST = {
     sky: "gg-bg.png",
     floor: "floor.png",
@@ -77,7 +70,7 @@ const ASSETS_LIST = {
 
 const imgObj = {};
 let assetsLoaded = 0;
-let totalToLoad = 17; // Total files including arrays
+const totalToLoad = 17;
 
 function loadAssets() {
     for (let key in ASSETS_LIST) {
@@ -91,28 +84,15 @@ function loadAssets() {
 
 function createImg(src) {
     const img = new Image();
-    img.onload = () => { assetsLoaded++; checkReady(); };
-    img.onerror = () => { console.error("Failed:", src); assetsLoaded++; checkReady(); };
+    img.onload = () => { assetsLoaded++; if (assetsLoaded >= totalToLoad) { document.getElementById('loading-zone').style.display='none'; document.getElementById('char-selection').style.display='flex'; } };
     img.src = src;
     return img;
 }
-
-function checkReady() {
-    let p = Math.floor((assetsLoaded / totalToLoad) * 100);
-    document.getElementById('load-text').innerText = `SYNCING: ${p}%`;
-    if (assetsLoaded >= totalToLoad) {
-        document.getElementById('loading-zone').style.display = 'none';
-        document.getElementById('char-selection').style.display = 'flex';
-    }
-}
 loadAssets();
 
-// --- GAME LOGIC ---
-let gameState = "START", cameraX = 0, frame = 0;
-const player = { x: 300, y: 0, vy: 0, speed: 8, jumping: false, dir: "right", key: 'lori' };
-const ufo = { x: 2000, y: 80, active: false, timer: 0 };
-const tank = { x: 1200, speed: 2.5 };
-let groundY = 0;
+let gameState = "START", cameraX = 0, frame = 0, groundY = 0;
+const player = { x: 300, y: 0, vy: 0, speed: 7, jumping: false, dir: "right", key: 'lori' };
+const tankObj = { x: 1200, speed: 2 };
 
 function selectChar(key) {
     player.key = key;
@@ -125,20 +105,16 @@ function selectChar(key) {
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    groundY = canvas.height - 180;
+    groundY = canvas.height - 120; // Lowered to fix the "hovering"
 }
 window.addEventListener("resize", resize); resize();
 
-// Input
 let keys = { left: false, right: false };
 document.getElementById('lBtn').ontouchstart = (e) => { e.preventDefault(); keys.left = true; };
 document.getElementById('lBtn').ontouchend = () => keys.left = false;
 document.getElementById('rBtn').ontouchstart = (e) => { e.preventDefault(); keys.right = true; };
 document.getElementById('rBtn').ontouchend = () => keys.right = false;
-document.getElementById('jBtn').ontouchstart = (e) => { 
-    e.preventDefault(); 
-    if(!player.jumping) { player.vy = -22; player.jumping = true; }
-};
+document.getElementById('jBtn').ontouchstart = (e) => { e.preventDefault(); if(!player.jumping) { player.vy = -20; player.jumping = true; } };
 
 function update() {
     if (gameState !== "PLAY") return;
@@ -147,17 +123,9 @@ function update() {
     
     player.vy += 1.2; player.y += player.vy;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
-
-    tank.x += tank.speed;
-    if (tank.x > player.x + 1500) tank.x = player.x - 1000;
-
-    ufo.timer++;
-    if (ufo.timer % 400 === 0) ufo.active = true;
-    if (ufo.active) {
-        ufo.x = player.x + 200;
-        if (ufo.timer % 800 === 0) ufo.active = false;
-    }
-
+    
+    tankObj.x += tankObj.speed;
+    if (tankObj.x > player.x + 1500) tankObj.x = player.x - 1000;
     cameraX = player.x - canvas.width / 2;
     document.getElementById('scoreVal').innerText = Math.floor(player.x / 10);
 }
@@ -166,49 +134,45 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (gameState !== "PLAY") return;
 
-    // Sky
+    // Fixed Sky Background
     ctx.drawImage(imgObj.sky, 0, 0, canvas.width, canvas.height);
     
-    // City Layers
+    // City Layers (Drawn from back to front)
     const blds = [imgObj.bldA, imgObj.bldB, imgObj.bldC, imgObj.bldD];
     for(let i=0; i<15; i++) {
         let b = blds[i % 4];
-        ctx.drawImage(b, (i * 500) - (cameraX * 0.3), groundY - 320, 350, 400);
+        // Slower parallax for background buildings (0.2 instead of 0.3)
+        ctx.drawImage(b, (i * 450) - (cameraX * 0.2), groundY - 400, 350, 480);
     }
 
-    // Tank
-    ctx.drawImage(imgObj.tank, tank.x - cameraX, groundY - 70, 220, 160);
-
-    // Floor
+    // Ground/Road Layer
     let fX = -cameraX % 128;
     for (let i = -1; i < (canvas.width / 128) + 2; i++) {
-        ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY + 50, 128, 128);
+        ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY, 128, 128);
     }
 
-    // UFO
-    if (ufo.active) {
-        ctx.fillStyle = "rgba(255, 0, 255, 0.2)";
-        ctx.fillRect(ufo.x - cameraX + 20, 120, 60, groundY - 50);
-        ctx.drawImage(imgObj.mochkilCaught, ufo.x - cameraX + 15, groundY - (ufo.timer % 180), 70, 90);
-    }
-    ctx.font = "70px serif"; ctx.fillText("🛸", ufo.x - cameraX, ufo.y + 60);
+    // Cardboard Tank (Drawn on top of road)
+    ctx.drawImage(imgObj.tank, tankObj.x - cameraX, groundY - 60, 200, 150);
 
-    // Player Animation
+    // Character Logic
     let runKey = player.key === 'lori' ? 'loriRun' : 'azulRun';
     let drawImg = (keys.left || keys.right) ? imgObj[runKey][Math.floor(frame % 3)] : imgObj[player.key];
     
     ctx.save();
     if (player.dir === "left") {
-        ctx.translate(player.x - cameraX + 40, 0); ctx.scale(-1, 1);
-        ctx.drawImage(drawImg, 0, player.y - 80, 85, 85);
+        ctx.translate(player.x - cameraX + 40, 0); 
+        ctx.scale(-1, 1);
+        ctx.drawImage(drawImg, 0, player.y - 80, 80, 80);
     } else {
-        ctx.drawImage(drawImg, player.x - cameraX - 40, player.y - 80, 85, 85);
+        ctx.drawImage(drawImg, player.x - cameraX - 40, player.y - 80, 80, 80);
     }
     ctx.restore();
+
+    requestAnimationFrame(draw);
 }
 
-function main() { update(); draw(); requestAnimationFrame(main); }
-main();
+setInterval(update, 1000/60);
+draw();
 </script>
 </body>
 </html>
