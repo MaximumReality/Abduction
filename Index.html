@@ -18,8 +18,8 @@
   .char-btn:hover { border-color: #0ff; transform: scale(1.05); }
   .char-btn img { width: 60px; height: 60px; object-fit: contain; }
   #controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 100; }
-  button { font-size: 30px; padding: 10px; border-radius: 12px; border: 1px solid #0ff; background: rgba(0,255,255,0.1); color: #fff; backdrop-filter: blur(5px); width: 70px; height: 70px; }
-  #stats { position: fixed; top: 20px; right: 20px; font-size: 24px; color: #0ff; display: none; text-shadow: 0 0 5px #0ff; }
+  button { font-size: 30px; padding: 10px; border-radius: 12px; border: 2px solid #0ff; background: rgba(0,255,255,0.1); color: #fff; backdrop-filter: blur(5px); width: 70px; height: 70px; touch-action: manipulation; }
+  #stats { position: fixed; top: 20px; right: 20px; font-size: 24px; color: #0ff; display: none; }
   .home-btn { position: fixed; top: 16px; left: 16px; z-index: 2000; background: #ff00ff; color: #fff; padding: 8px 12px; border-radius: 12px; text-decoration: none; font-weight: bold; }
 </style>
 </head>
@@ -31,7 +31,7 @@
   <div class="title">MAXIMUM <span>REALITY</span></div>
   <div id="loading-zone">
       <div class="loader">⏳</div>
-      <p id="load-text">CONNECTING TO REALITY...</p>
+      <p id="load-text">UPLOADING FOLDER DATA...</p>
   </div>
   
   <div id="char-selection">
@@ -48,9 +48,9 @@
 <canvas id="game"></canvas>
 
 <div id="controls">
-  <button id="leftBtn">⬅️</button>
-  <button id="jumpBtn">⬆️</button>
-  <button id="rightBtn">➡️</button>
+  <button id="lBtn">⬅️</button>
+  <button id="jBtn">⬆️</button>
+  <button id="rBtn">➡️</button>
   <button onclick="location.reload()">🎬</button>
 </div>
 
@@ -58,48 +58,64 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// --- ASSET CONFIG ---
+// --- UPDATED ASSET LIST (MATCHING YOUR FOLDER) ---
 const ASSETS_LIST = {
     sky: "gg-bg.png",
     floor: "floor.png",
-    building: "building-c.png",
+    bldA: "building-a.png",
+    bldB: "building-b.png",
+    bldC: "building-c.png",
+    bldD: "building-d.png",
     mochkilCaught: "Mochkil-caught.png",
-    puffs: "mochkil_puffs.png",
-    tank: "cardboard-tank.png",
+    tank: "cardboard_tank.png",
     lori: "lori.png",
     azul: "azul_sitting.png",
-    skater: "mochkil-skate.png"
+    skater: "mochkil-skate.png",
+    loriRun: ["Lori-run.png", "Lori-run2.png", "Lori-run3.png"],
+    azulRun: ["Azul-run.png", "Azul-run2.png", "Azul-run3.png"]
 };
 
 const imgObj = {};
 let assetsLoaded = 0;
-const totalAssets = Object.keys(ASSETS_LIST).length;
+let totalToLoad = 17; // Total files including arrays
 
 function loadAssets() {
     for (let key in ASSETS_LIST) {
-        imgObj[key] = new Image();
-        imgObj[key].onload = () => {
-            assetsLoaded++;
-            document.getElementById('load-text').innerText = `SYNCING: ${Math.floor((assetsLoaded/totalAssets)*100)}%`;
-            if (assetsLoaded >= totalAssets) {
-                document.getElementById('loading-zone').style.display = 'none';
-                document.getElementById('char-selection').style.display = 'flex';
-            }
-        };
-        imgObj[key].src = ASSETS_LIST[key];
+        if (Array.isArray(ASSETS_LIST[key])) {
+            imgObj[key] = ASSETS_LIST[key].map(src => createImg(src));
+        } else {
+            imgObj[key] = createImg(ASSETS_LIST[key]);
+        }
+    }
+}
+
+function createImg(src) {
+    const img = new Image();
+    img.onload = () => { assetsLoaded++; checkReady(); };
+    img.onerror = () => { console.error("Failed:", src); assetsLoaded++; checkReady(); };
+    img.src = src;
+    return img;
+}
+
+function checkReady() {
+    let p = Math.floor((assetsLoaded / totalToLoad) * 100);
+    document.getElementById('load-text').innerText = `SYNCING: ${p}%`;
+    if (assetsLoaded >= totalToLoad) {
+        document.getElementById('loading-zone').style.display = 'none';
+        document.getElementById('char-selection').style.display = 'flex';
     }
 }
 loadAssets();
 
 // --- GAME LOGIC ---
-let gameState = "START", cameraX = 0, score = 0;
-const player = { x: 300, y: 0, vy: 0, speed: 8, jumping: false, dir: "right", img: null };
-const ufo = { x: 2000, y: 100, active: false, timer: 0 };
-const tank = { x: 1000, speed: 2 };
+let gameState = "START", cameraX = 0, frame = 0;
+const player = { x: 300, y: 0, vy: 0, speed: 8, jumping: false, dir: "right", key: 'lori' };
+const ufo = { x: 2000, y: 80, active: false, timer: 0 };
+const tank = { x: 1200, speed: 2.5 };
 let groundY = 0;
 
 function selectChar(key) {
-    player.img = imgObj[key];
+    player.key = key;
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('controls').style.display = 'flex';
     document.getElementById('stats').style.display = 'block';
@@ -110,106 +126,89 @@ function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     groundY = canvas.height - 180;
-    player.y = groundY;
 }
 window.addEventListener("resize", resize); resize();
 
-// --- CONTROLS ---
+// Input
 let keys = { left: false, right: false };
-document.getElementById('leftBtn').ontouchstart = () => keys.left = true;
-document.getElementById('leftBtn').ontouchend = () => keys.left = false;
-document.getElementById('rightBtn').ontouchstart = () => keys.right = true;
-document.getElementById('rightBtn').ontouchend = () => keys.right = false;
-document.getElementById('jumpBtn').ontouchstart = () => {
-    if(!player.jumping) { player.vy = -20; player.jumping = true; }
+document.getElementById('lBtn').ontouchstart = (e) => { e.preventDefault(); keys.left = true; };
+document.getElementById('lBtn').ontouchend = () => keys.left = false;
+document.getElementById('rBtn').ontouchstart = (e) => { e.preventDefault(); keys.right = true; };
+document.getElementById('rBtn').ontouchend = () => keys.right = false;
+document.getElementById('jBtn').ontouchstart = (e) => { 
+    e.preventDefault(); 
+    if(!player.jumping) { player.vy = -22; player.jumping = true; }
 };
 
 function update() {
     if (gameState !== "PLAY") return;
-
-    if (keys.left) { player.x -= player.speed; player.dir = "left"; }
-    if (keys.right) { player.x += player.speed; player.dir = "right"; }
-
-    player.vy += 1; 
-    player.y += player.vy;
+    if (keys.left) { player.x -= player.speed; player.dir = "left"; frame += 0.15; }
+    if (keys.right) { player.x += player.speed; player.dir = "right"; frame += 0.15; }
+    
+    player.vy += 1.2; player.y += player.vy;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
 
-    // Tank Movement
     tank.x += tank.speed;
-    if (tank.x > player.x + 1000) tank.x = player.x - 1000;
+    if (tank.x > player.x + 1500) tank.x = player.x - 1000;
 
-    // UFO Logic
     ufo.timer++;
-    if (ufo.timer % 500 === 0) ufo.active = true;
+    if (ufo.timer % 400 === 0) ufo.active = true;
     if (ufo.active) {
-        ufo.x = player.x + 100;
-        if (ufo.timer % 1000 === 0) ufo.active = false;
+        ufo.x = player.x + 200;
+        if (ufo.timer % 800 === 0) ufo.active = false;
     }
 
     cameraX = player.x - canvas.width / 2;
-    score = Math.floor(player.x / 10);
-    document.getElementById('scoreVal').innerText = score;
+    document.getElementById('scoreVal').innerText = Math.floor(player.x / 10);
 }
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (gameState !== "PLAY") return;
 
-    // Background
+    // Sky
     ctx.drawImage(imgObj.sky, 0, 0, canvas.width, canvas.height);
     
-    // Buildings (Parallax)
-    for(let i=0; i<10; i++) {
-        ctx.drawImage(imgObj.building, (i * 600) - (cameraX * 0.2), groundY - 350, 400, 400);
-    }
-
-    // Floor
-    let floorMove = -cameraX % 128;
-    for (let i = -1; i < (canvas.width / 128) + 2; i++) {
-        ctx.drawImage(imgObj.floor, (i * 128) + floorMove, groundY + 60, 128, 128);
+    // City Layers
+    const blds = [imgObj.bldA, imgObj.bldB, imgObj.bldC, imgObj.bldD];
+    for(let i=0; i<15; i++) {
+        let b = blds[i % 4];
+        ctx.drawImage(b, (i * 500) - (cameraX * 0.3), groundY - 320, 350, 400);
     }
 
     // Tank
-    ctx.drawImage(imgObj.tank, tank.x - cameraX, groundY - 60, 200, 150);
+    ctx.drawImage(imgObj.tank, tank.x - cameraX, groundY - 70, 220, 160);
 
-    // UFO Abduction Sequence
-    if (ufo.active) {
-        ctx.fillStyle = "rgba(0, 255, 255, 0.2)";
-        ctx.beginPath();
-        ctx.moveTo(ufo.x - cameraX + 50, ufo.y + 50);
-        ctx.lineTo(ufo.x - cameraX - 50, groundY + 60);
-        ctx.lineTo(ufo.x - cameraX + 150, groundY + 60);
-        ctx.fill();
-        ctx.drawImage(imgObj.mochkilCaught, ufo.x - cameraX + 20, groundY - (ufo.timer % 200), 70, 90);
-        ctx.drawImage(imgObj.puffs, ufo.x - cameraX + 100, groundY - 50, 50, 70);
+    // Floor
+    let fX = -cameraX % 128;
+    for (let i = -1; i < (canvas.width / 128) + 2; i++) {
+        ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY + 50, 128, 128);
     }
-    ctx.font = "80px serif";
-    ctx.fillText("🛸", ufo.x - cameraX, ufo.y + 60);
 
-    // Player
+    // UFO
+    if (ufo.active) {
+        ctx.fillStyle = "rgba(255, 0, 255, 0.2)";
+        ctx.fillRect(ufo.x - cameraX + 20, 120, 60, groundY - 50);
+        ctx.drawImage(imgObj.mochkilCaught, ufo.x - cameraX + 15, groundY - (ufo.timer % 180), 70, 90);
+    }
+    ctx.font = "70px serif"; ctx.fillText("🛸", ufo.x - cameraX, ufo.y + 60);
+
+    // Player Animation
+    let runKey = player.key === 'lori' ? 'loriRun' : 'azulRun';
+    let drawImg = (keys.left || keys.right) ? imgObj[runKey][Math.floor(frame % 3)] : imgObj[player.key];
+    
     ctx.save();
     if (player.dir === "left") {
-        ctx.translate(player.x - cameraX + 40, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(player.img, 0, player.y - 80, 80, 80);
+        ctx.translate(player.x - cameraX + 40, 0); ctx.scale(-1, 1);
+        ctx.drawImage(drawImg, 0, player.y - 80, 85, 85);
     } else {
-        ctx.drawImage(player.img, player.x - cameraX - 40, player.y - 80, 80, 80);
+        ctx.drawImage(drawImg, player.x - cameraX - 40, player.y - 80, 85, 85);
     }
     ctx.restore();
-
-    requestAnimationFrame(draw);
 }
 
-function loop() {
-    update();
-    if (gameState === "PLAY") {
-        // draw is now handled by requestAnimationFrame for smoothness
-    } else {
-        requestAnimationFrame(loop);
-    }
-}
-draw(); // Start draw loop
-setInterval(update, 1000/60); // Start physics loop
+function main() { update(); draw(); requestAnimationFrame(main); }
+main();
 </script>
 </body>
 </html>
