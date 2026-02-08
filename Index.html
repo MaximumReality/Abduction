@@ -3,63 +3,56 @@
 <head>
 <meta charset="UTF-8">
 <title>MAXIMUM REALITY: Abduction 2.0</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
   html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: white; }
-  canvas { display: block; }
+  canvas { display: block; background: #000; }
   #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; padding: 20px; text-align: center; }
-  .loader { font-size: 50px; animation: spin 2s linear infinite; margin-bottom: 20px; }
-  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-  .title { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff, 0 0 20px #00ffff; }
+  .title { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff; }
   #char-selection { display: none; flex-direction: column; align-items: center; }
   .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
-  .char-btn { background: #111; border: 2px solid #444; border-radius: 15px; padding: 10px; cursor: pointer; transition: 0.2s; }
-  .char-btn:hover { border-color: #0ff; transform: scale(1.05); }
+  .char-btn { background: #111; border: 2px solid #444; border-radius: 15px; padding: 10px; cursor: pointer; }
   .char-btn img { width: 60px; height: 60px; object-fit: contain; }
   #controls { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 100; }
-  button { font-size: 30px; padding: 10px; border-radius: 12px; border: 2px solid #0ff; background: rgba(0,255,255,0.1); color: #fff; width: 70px; height: 70px; touch-action: manipulation; }
+  button { font-size: 30px; width: 70px; height: 70px; background: rgba(0,255,255,0.2); border: 2px solid #0ff; color: white; border-radius: 15px; touch-action: manipulation; }
+  #debug-btn { margin-top: 20px; padding: 10px; background: red; color: white; display: none; border-radius: 5px; cursor: pointer; }
 </style>
 </head>
 <body>
 
 <div id="overlay">
-  <div class="title">MAXIMUM <span>REALITY</span></div>
+  <div class="title">MAXIMUM REALITY</div>
   <div id="loading-zone">
-      <div class="loader">⏳</div>
-      <p id="load-text">UPLOADING FOLDER DATA...</p>
+      <div id="load-text">CONNECTING TO THE GRID...</div>
+      <div id="debug-btn" onclick="showSelection()">FORCE START (DEBUG)</div>
   </div>
   <div id="char-selection">
-      <h3 style="color:#00ffff; margin-bottom: 20px;">SELECT YOUR CHARACTER</h3>
+      <h3 style="color:#0ff;">CHOOSE YOUR HERO</h3>
       <div class="char-grid">
-        <div class="char-btn" onclick="selectChar('lori')"><img src="lori.png"><p>LORI</p></div>
-        <div class="char-btn" onclick="selectChar('azul')"><img src="azul_sitting.png"><p>AZUL</p></div>
-        <div class="char-btn" onclick="selectChar('skater')"><img src="mochkil-skate.png"><p>SKATER</p></div>
+        <div class="char-btn" onclick="startGame('lori')"><img src="lori.png"><p>LORI</p></div>
+        <div class="char-btn" onclick="startGame('azul')"><img src="azul_sitting.png"><p>AZUL</p></div>
+        <div class="char-btn" onclick="startGame('skater')"><img src="mochkil-skate.png"><p>SKATER</p></div>
       </div>
   </div>
 </div>
 
-<div id="stats" style="position:fixed; top:20px; right:20px; display:none; font-size:24px; color:#0ff;">SCORE: <span id="scoreVal">0</span></div>
 <canvas id="game"></canvas>
 
 <div id="controls">
   <button id="lBtn">⬅️</button>
   <button id="jBtn">⬆️</button>
   <button id="rBtn">➡️</button>
-  <button onclick="location.reload()">🎬</button>
 </div>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-const ASSETS_LIST = {
+const ASSETS = {
     sky: "gg-bg.png",
     floor: "floor.png",
     bldA: "building-a.png",
     bldB: "building-b.png",
-    bldC: "building-c.png",
-    bldD: "building-d.png",
-    mochkilCaught: "Mochkil-caught.png",
     tank: "cardboard_tank.png",
     lori: "lori.png",
     azul: "azul_sitting.png",
@@ -69,110 +62,116 @@ const ASSETS_LIST = {
 };
 
 const imgObj = {};
-let assetsLoaded = 0;
-const totalToLoad = 17;
+let loadedCount = 0;
+const totalNeeded = 14; 
 
-function loadAssets() {
-    for (let key in ASSETS_LIST) {
-        if (Array.isArray(ASSETS_LIST[key])) {
-            imgObj[key] = ASSETS_LIST[key].map(src => createImg(src));
+function loadAll() {
+    for (let key in ASSETS) {
+        if (Array.isArray(ASSETS[key])) {
+            imgObj[key] = ASSETS[key].map(src => {
+                const i = new Image();
+                i.onload = count;
+                i.onerror = count; // Don't freeze if 1 image is missing
+                i.src = src;
+                return i;
+            });
         } else {
-            imgObj[key] = createImg(ASSETS_LIST[key]);
+            imgObj[key] = new Image();
+            imgObj[key].onload = count;
+            imgObj[key].onerror = count;
+            imgObj[key].src = ASSETS[key];
         }
     }
 }
 
-function createImg(src) {
-    const img = new Image();
-    img.onload = () => { assetsLoaded++; if (assetsLoaded >= totalToLoad) { document.getElementById('loading-zone').style.display='none'; document.getElementById('char-selection').style.display='flex'; } };
-    img.src = src;
-    return img;
+function count() {
+    loadedCount++;
+    document.getElementById('load-text').innerText = `SYNCING: ${Math.floor((loadedCount/totalNeeded)*100)}%`;
+    if (loadedCount >= totalNeeded) showSelection();
 }
-loadAssets();
 
-let gameState = "START", cameraX = 0, frame = 0, groundY = 0;
-const player = { x: 300, y: 0, vy: 0, speed: 7, jumping: false, dir: "right", key: 'lori' };
-const tankObj = { x: 1200, speed: 2 };
+// If it takes longer than 4 seconds, show the Force Start button
+setTimeout(() => { if(loadedCount < totalNeeded) document.getElementById('debug-btn').style.display='block'; }, 4000);
 
-function selectChar(key) {
+function showSelection() {
+    document.getElementById('loading-zone').style.display = 'none';
+    document.getElementById('char-selection').style.display = 'flex';
+}
+
+let player = { x: 300, y: 0, vy: 0, dir: "right", key: 'lori', jumping: false };
+let cameraX = 0, groundY = 0, frame = 0, active = false;
+let keys = { left: false, right: false };
+
+function startGame(key) {
     player.key = key;
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('controls').style.display = 'flex';
-    document.getElementById('stats').style.display = 'block';
-    gameState = "PLAY";
+    active = true;
+    resize();
+    loop();
 }
 
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    groundY = canvas.height - 120; // Lowered to fix the "hovering"
+    groundY = canvas.height - 100; // Character feet level
+    player.y = groundY;
 }
-window.addEventListener("resize", resize); resize();
+window.addEventListener("resize", resize);
 
-let keys = { left: false, right: false };
-document.getElementById('lBtn').ontouchstart = (e) => { e.preventDefault(); keys.left = true; };
-document.getElementById('lBtn').ontouchend = () => keys.left = false;
-document.getElementById('rBtn').ontouchstart = (e) => { e.preventDefault(); keys.right = true; };
-document.getElementById('rBtn').ontouchend = () => keys.right = false;
-document.getElementById('jBtn').ontouchstart = (e) => { e.preventDefault(); if(!player.jumping) { player.vy = -20; player.jumping = true; } };
+// Mobile Touch Events
+const bind = (id, k) => {
+    const el = document.getElementById(id);
+    el.ontouchstart = (e) => { e.preventDefault(); if(k==='jump') { if(!player.jumping){player.vy=-20; player.jumping=true;} } else { keys[k]=true; } };
+    el.ontouchend = (e) => { if(k!=='jump') keys[k]=false; };
+};
+bind('lBtn', 'left'); bind('rBtn', 'right'); bind('jBtn', 'jump');
 
-function update() {
-    if (gameState !== "PLAY") return;
-    if (keys.left) { player.x -= player.speed; player.dir = "left"; frame += 0.15; }
-    if (keys.right) { player.x += player.speed; player.dir = "right"; frame += 0.15; }
+function loop() {
+    if(!active) return;
+
+    // Logic
+    if(keys.left) { player.x -= 7; player.dir = "left"; frame += 0.2; }
+    if(keys.right) { player.x += 7; player.dir = "right"; frame += 0.2; }
     
-    player.vy += 1.2; player.y += player.vy;
-    if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
+    player.vy += 1;
+    player.y += player.vy;
+    if(player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
     
-    tankObj.x += tankObj.speed;
-    if (tankObj.x > player.x + 1500) tankObj.x = player.x - 1000;
     cameraX = player.x - canvas.width / 2;
-    document.getElementById('scoreVal').innerText = Math.floor(player.x / 10);
-}
 
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (gameState !== "PLAY") return;
+    // Draw
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Fixed Sky Background
-    ctx.drawImage(imgObj.sky, 0, 0, canvas.width, canvas.height);
-    
-    // City Layers (Drawn from back to front)
-    const blds = [imgObj.bldA, imgObj.bldB, imgObj.bldC, imgObj.bldD];
-    for(let i=0; i<15; i++) {
-        let b = blds[i % 4];
-        // Slower parallax for background buildings (0.2 instead of 0.3)
-        ctx.drawImage(b, (i * 450) - (cameraX * 0.2), groundY - 400, 350, 480);
+    // Parallax Sky
+    if(imgObj.sky.complete) ctx.drawImage(imgObj.sky, 0, 0, canvas.width, canvas.height);
+
+    // Floor
+    if(imgObj.floor.complete) {
+        let fX = -cameraX % 128;
+        for (let i = -1; i < (canvas.width / 128) + 2; i++) {
+            ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY + 20, 128, 128);
+        }
     }
 
-    // Ground/Road Layer
-    let fX = -cameraX % 128;
-    for (let i = -1; i < (canvas.width / 128) + 2; i++) {
-        ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY, 128, 128);
-    }
+    // Player
+    let runSet = player.key === 'lori' ? imgObj.loriRun : imgObj.azulRun;
+    let img = (keys.left || keys.right) ? runSet[Math.floor(frame % 3)] : imgObj[player.key];
 
-    // Cardboard Tank (Drawn on top of road)
-    ctx.drawImage(imgObj.tank, tankObj.x - cameraX, groundY - 60, 200, 150);
-
-    // Character Logic
-    let runKey = player.key === 'lori' ? 'loriRun' : 'azulRun';
-    let drawImg = (keys.left || keys.right) ? imgObj[runKey][Math.floor(frame % 3)] : imgObj[player.key];
-    
     ctx.save();
-    if (player.dir === "left") {
-        ctx.translate(player.x - cameraX + 40, 0); 
-        ctx.scale(-1, 1);
-        ctx.drawImage(drawImg, 0, player.y - 80, 80, 80);
+    if(player.dir === "left") {
+        ctx.translate(player.x - cameraX + 40, 0); ctx.scale(-1, 1);
+        ctx.drawImage(img, 0, player.y - 75, 80, 80);
     } else {
-        ctx.drawImage(drawImg, player.x - cameraX - 40, player.y - 80, 80, 80);
+        ctx.drawImage(img, player.x - cameraX - 40, player.y - 75, 80, 80);
     }
     ctx.restore();
 
-    requestAnimationFrame(draw);
+    requestAnimationFrame(loop);
 }
 
-setInterval(update, 1000/60);
-draw();
+loadAll();
 </script>
 </body>
 </html>
