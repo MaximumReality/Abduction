@@ -2,145 +2,147 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>MAXIMUM REALITY: Abduction 2.0</title>
+<title>MAXIMUM REALITY: Full Layering</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; color: white; }
-  canvas { display: block; }
-  #ui { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.9); z-index: 100; }
-  .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
-  .char-btn { padding: 10px; background: #111; border: 2px solid #0ff; border-radius: 15px; cursor: pointer; text-align: center; }
-  .char-btn img { width: 60px; height: 60px; object-fit: contain; }
-  #controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: none; gap: 20px; z-index: 100; }
-  .ctrl { width: 75px; height: 75px; background: rgba(255,0,255,0.2); border: 2px solid #f0f; color: white; font-size: 35px; border-radius: 50%; touch-action: manipulation; }
+    body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; }
+    canvas { display: block; }
+    #ui { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; color: #0ff; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .btn { cursor: pointer; text-align: center; border: 2px solid #f0f; padding: 10px; border-radius: 10px; background: #111; }
+    .btn img { width: 60px; height: 60px; }
+    #controls { position: fixed; bottom: 20px; width: 100%; display: none; justify-content: center; gap: 30px; z-index: 500; }
+    .touch-btn { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #0ff; background: rgba(0,255,255,0.1); color: white; font-size: 40px; }
 </style>
 </head>
 <body>
 
 <div id="ui">
-  <h1 style="color:#f0f; text-shadow: 0 0 10px #f0f;">MAXIMUM REALITY</h1>
-  <div class="char-grid">
-    <div class="char-btn" onclick="start('lori')"><img src="lori.png"><p>LORI</p></div>
-    <div class="char-btn" onclick="start('azul')"><img src="azul_sitting.png"><p>AZUL</p></div>
-    <div class="char-btn" onclick="start('skater')"><img src="mochkil-skate.png"><p>SKATER</p></div>
-  </div>
+    <h1>MAXIMUM REALITY</h1>
+    <div class="grid">
+        <div class="btn" onclick="init('lori')"><img src="lori.png"><p>LORI</p></div>
+        <div class="btn" onclick="init('azul')"><img src="azul_sitting.png"><p>AZUL</p></div>
+        <div class="btn" onclick="init('skater')"><img src="mochkil-skate.png"><p>SKATER</p></div>
+    </div>
 </div>
 
 <div id="controls">
-  <button class="ctrl" id="lBtn">⬅️</button>
-  <button class="ctrl" id="jBtn">⬆️</button>
-  <button class="ctrl" id="rBtn">➡️</button>
+    <button class="touch-btn" id="lBtn">⬅️</button>
+    <button class="touch-btn" id="jBtn">⬆️</button>
+    <button class="touch-btn" id="rBtn">➡️</button>
 </div>
 
 <canvas id="game"></canvas>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
 
-// --- YOUR ASSET LOGIC ---
+// --- YOUR ASSET STRUCTURE ---
 const assets = {};
-const toLoad = ['gg-bg.png', 'building-a.png', 'building-b.png', 'building-c.png', 'building-d.png', 'floor.png', 'cardboard_tank.png', 'Mochkil-caught.png'];
-// Individual characters and runs
-const extras = ['lori.png', 'azul_sitting.png', 'mochkil-skate.png', 'Lori-run.png', 'Lori-run2.png', 'Lori-run3.png', 'Azul-run.png', 'Azul-run2.png', 'Azul-run3.png'];
+const toLoad = [
+    'gg-bg.png', 'building-a.png', 'building-b.png', 'building-c.png', 'building-d.png', 
+    'floor.png', 'cardboard_tank.png', 'Mochkil-caught.png', 'lori.png', 'azul_sitting.png',
+    'mochkil-skate.png', 'Lori-run.png', 'Lori-run2.png', 'Lori-run3.png', 
+    'Azul-run.png', 'Azul-run2.png', 'Azul-run3.png'
+];
 
-[...toLoad, ...extras].forEach(src => {
+toLoad.forEach(src => {
     assets[src] = new Image();
-    assets[src].src = src; 
+    assets[src].src = src;
 });
 
-let p = { x: 500, y: 0, vy: 0, dir: "right", char: 'lori', jump: false },
-    keys = { l: false, r: false }, camX = 0, gY = 0, frame = 0, active = false;
+let state = {
+    active: false,
+    camX: 0,
+    player: { x: 400, y: 0, vy: 0, char: 'lori', dir: 'right', frame: 0, jumping: false },
+    tank: { x: 1500, speed: -2 },
+    groundY: 0
+};
 
-let tank = { x: 1200, speed: -3 }; // Moves West while you move East
+let input = { left: false, right: false };
 
-function start(key) {
-    p.char = key;
+function init(char) {
+    state.player.char = char;
+    state.active = true;
     document.getElementById('ui').style.display = 'none';
     document.getElementById('controls').style.display = 'flex';
-    active = true;
     resize();
-    requestAnimationFrame(loop);
+    loop();
 }
 
 function resize() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    gY = canvas.height - 160; 
-    p.y = gY;
+    state.groundY = canvas.height - 150;
+    state.player.y = state.groundY;
 }
 window.addEventListener('resize', resize);
 
-// Inputs
-const bind = (id, k, t) => {
-    document.getElementById(id).addEventListener(t, (e) => {
-        e.preventDefault();
-        if (k === 'j') { if(!p.jump){ p.vy = -22; p.jump = true; } }
-        else { keys[k] = (t === 'touchstart'); }
-    });
+// Input Binds
+const b = (id, k) => {
+    const el = document.getElementById(id);
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); if(k==='j'){ if(!state.player.jumping){state.player.vy=-20; state.player.jumping=true;}} else input[k]=true; });
+    el.addEventListener('touchend', (e) => { if(k!=='j') input[k]=false; });
 };
-bind('lBtn','l','touchstart'); bind('lBtn','l','touchend');
-bind('rBtn','r','touchstart'); bind('rBtn','r','touchend');
-bind('jBtn','j','touchstart');
+b('lBtn', 'left'); b('rBtn', 'right'); b('jBtn', 'j');
 
 function loop() {
-    if (!active) return;
-
-    if (keys.l) { p.x -= 8; p.dir = "left"; frame += 0.2; }
-    if (keys.r) { p.x += 8; p.dir = "right"; frame += 0.2; }
-    p.vy += 1.2; p.y += p.vy;
-    if (p.y > gY) { p.y = gY; p.vy = 0; p.jump = false; }
+    if(!state.active) return;
     
-    // Tank logic
-    tank.x += tank.speed;
-    if (tank.x < p.x - 1000) tank.x = p.x + 1500;
+    // Update
+    let p = state.player;
+    if(input.left) { p.x -= 8; p.dir = 'left'; p.frame += 0.2; }
+    if(input.right) { p.x += 8; p.dir = 'right'; p.frame += 0.2; }
+    
+    p.vy += 1; p.y += p.vy;
+    if(p.y > state.groundY) { p.y = state.groundY; p.vy = 0; p.jumping = false; }
+    
+    state.tank.x += state.tank.speed;
+    if(state.tank.x < p.x - 1000) state.tank.x = p.x + 1200;
+    
+    state.camX = p.x - canvas.width / 2;
 
-    camX = p.x - window.innerWidth / 2;
-
+    // Draw Layers
     ctx.clearRect(0,0,canvas.width, canvas.height);
 
-    // 1. SKY (Parallax)
-    if (assets['gg-bg.png'].complete) {
-        let skyX = -(camX * 0.1) % canvas.width;
-        ctx.drawImage(assets['gg-bg.png'], skyX, 0, canvas.width, canvas.height);
-        ctx.drawImage(assets['gg-bg.png'], skyX + canvas.width, 0, canvas.width, canvas.height);
-    }
+    // 1. SKY (Static-ish)
+    if(assets['gg-bg.png'].complete) ctx.drawImage(assets['gg-bg.png'], 0, 0, canvas.width, canvas.height);
 
-    // 2. BUILDINGS (Middle Layer)
-    const blds = ['building-a.png', 'building-b.png', 'building-c.png', 'building-d.png'];
-    blds.forEach((name, i) => {
-        if (assets[name].complete) {
-            let bX = (i * 600) - (camX * 0.5);
-            ctx.drawImage(assets[name], bX, gY - 350, 400, 500);
+    // 2. BUILDINGS (Parallax)
+    const bNames = ['building-a.png', 'building-b.png', 'building-c.png', 'building-d.png'];
+    bNames.forEach((name, i) => {
+        if(assets[name].complete) {
+            let bx = (i * 500) - (state.camX * 0.4);
+            ctx.drawImage(assets[name], bx, state.groundY - 350, 400, 450);
         }
     });
 
-    // 3. TANK (Road Object)
-    if (assets['cardboard_tank.png'].complete) {
-        ctx.drawImage(assets['cardboard_tank.png'], tank.x - camX, gY - 60, 220, 160);
+    // 3. TANK (On the Road)
+    if(assets['cardboard_tank.png'].complete) {
+        ctx.drawImage(assets['cardboard_tank.png'], state.tank.x - state.camX, state.groundY - 60, 220, 150);
     }
 
-    // 4. FLOOR (Covering Layer)
-    if (assets['floor.png'].complete) {
-        let fW = 128;
-        let fX = -camX % fW;
-        for (let i = -1; i < (canvas.width / fW) + 2; i++) {
-            ctx.drawImage(assets['floor.png'], (i * fW) + fX, gY + 80, fW, fW);
+    // 4. FLOOR (Cover Layer)
+    if(assets['floor.png'].complete) {
+        let fX = -state.camX % 128;
+        for(let i=-1; i < (canvas.width/128)+2; i++) {
+            ctx.drawImage(assets['floor.png'], (i*128)+fX, state.groundY + 70, 128, 128);
         }
     }
 
-    // 5. CHARACTER
-    let runSet = p.char === 'lori' ? ['Lori-run.png', 'Lori-run2.png', 'Lori-run3.png'] : ['Azul-run.png', 'Azul-run2.png', 'Azul-run3.png'];
-    let idle = p.char === 'lori' ? 'lori.png' : (p.char === 'azul' ? 'azul_sitting.png' : 'mochkil-skate.png');
-    
-    let drawImgName = (keys.l || keys.r) ? runSet[Math.floor(frame % 3)] : idle;
-    let drawImg = assets[drawImgName];
+    // 5. PLAYER
+    let char = p.char;
+    let run = char === 'lori' ? ['Lori-run.png', 'Lori-run2.png', 'Lori-run3.png'] : ['Azul-run.png', 'Azul-run2.png', 'Azul-run3.png'];
+    let idle = char === 'lori' ? 'lori.png' : (char === 'azul' ? 'azul_sitting.png' : 'mochkil-skate.png');
+    let imgName = (input.left || input.right) ? run[Math.floor(p.frame % 3)] : idle;
+    let img = assets[imgName];
 
-    if (drawImg && drawImg.complete) {
+    if(img && img.complete) {
         ctx.save();
-        ctx.translate(p.x - camX, p.y - 10);
-        if (p.dir === "left") ctx.scale(-1, 1);
-        ctx.drawImage(drawImg, -50, -100, 100, 100);
+        ctx.translate(p.x - state.camX, p.y - 10);
+        if(p.dir === 'left') ctx.scale(-1, 1);
+        ctx.drawImage(img, -50, -100, 100, 100);
         ctx.restore();
     }
 
