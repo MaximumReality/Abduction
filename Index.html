@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MAXIMUM REALITY: Abduction</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: white; }
+  canvas { display: block; }
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; padding: 20px; text-align: center; }
+  .title { font-size: 2.5rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; color: #ff00ff; text-shadow: 0 0 10px #ff00ff, 0 0 20px #00ffff; }
+  .title span { color: #00ffff; }
+  #header-img { width: 280px; height: auto; margin-bottom: 20px; border: 2px solid #00ffff; border-radius: 10px; box-shadow: 0 0 15px #ff00ff; }
+  .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 500px; }
+  .char-btn { background: #111; border: 2px solid #444; border-radius: 15px; padding: 10px; cursor: pointer; transition: 0.2s; }
+  .char-btn:hover { border-color: #0ff; transform: scale(1.05); }
+  .char-btn img, .char-btn div { width: 50px; height: 50px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+  .char-btn p { margin: 8px 0 0; font-size: 10px; text-transform: uppercase; color: #0ff; }
+  #controls { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 100; align-items: center; }
+  button { font-size: 24px; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,255,255,0.5); background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); touch-action: manipulation; width: 65px; height: 60px; }
+  #restartBtn { background: rgba(255, 0, 255, 0.2); border-color: #ff00ff; }
+  #musicToggle { background: rgba(0, 255, 255, 0.1); border-color: #0ff; }
+  #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; font-size: 18px; color: #0ff; }
+  .instruction { font-size: 12px; color: #ff00ff; margin-top: 15px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<!-- Home Button -->
+<a href="https://maximumreality.xyz/" class="home-btn" title="Go to Maximum Reality Home">🏠 Home</a>
+
+<style>
+.home-btn {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 2000;
+  background: rgba(255, 0, 255, 0.8);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.home-btn:hover {
+  transform: scale(1.05);
+  background: rgba(255, 0, 255, 1);
+}
+</style>
+<div id="overlay">
+  <div class="title">MAXIMUM <span>REALITY</span></div>
+  <p style="margin-top:-10px; color:#ff00ff; font-weight:bold;">ABDUCTION</p>
+  <img src="abduction.png" id="header-img">
+  <h3 id="overlay-msg">SELECT YOUR CHARACTER</h3>
+  <div class="char-grid">
+    <div class="char-btn" onclick="selectChar('lori')"><img src="lori.png"><p>Lori</p></div>
+    <div class="char-btn" onclick="selectChar('man')"><div>🏃🏻‍♂️</div><p>Man</p></div>
+    <div class="char-btn" onclick="selectChar('wc_man')"><div>👨🏻‍🦽</div><p>Wheelchair M</p></div>
+    <div class="char-btn" onclick="selectChar('woman')"><div>🧍🏼‍♀️</div><p>Woman</p></div>
+    <div class="char-btn" onclick="selectChar('wc_woman')"><div>👩🏽‍🦽‍➡️</div><p>Wheelchair W</p></div>
+  </div>
+  <div class="instruction">🎬 = RESTART MISSION | 🔊 = SCI-FI SYNTH</div>
+  <p id="high-score-display" style="font-size:10px; margin-top:10px; color:#aaa;"></p>
+</div>
+
+<div id="stats">
+  <div>SCORE: <span id="scoreVal">0</span></div>
+  <div id="fuelContainer" style="display:none;">
+    FUEL: <div style="width:100px; height:10px; background:#444; display:inline-block; border:1px solid #0ff;"><div id="fuelBar" style="width:100%; height:100%; background:#0f0;"></div></div>
+  </div>
+</div>
+
+<canvas id="game"></canvas>
+
+<div id="controls">
+  <button id="left">⬅️</button>
+  <button id="jump">⬆️</button>
+  <button id="right">➡️</button>
+  <button id="restartBtn" onclick="returnToTitle()">🎬</button>
+  <button id="musicToggle" onclick="toggleMusic()">🔇</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+/* --- AUDIO --- */
+let audioCtx = null, musicInterval = null, musicPlaying = false;
+function toggleMusic() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const btn = document.getElementById('musicToggle');
+  if (!musicPlaying) {
+    musicPlaying = true; btn.innerText = "🔊";
+    const playSequence = () => {
+      const t = audioCtx.currentTime;
+      const sequence = [{ f: 110, time: 0.0 }, { f: 110, time: 0.4 }, { f: 130, time: 0.8 }, { f: 146, time: 1.2 }];
+      sequence.forEach(note => {
+        const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(note.f, t + note.time);
+        g.gain.setValueAtTime(0, t + note.time);
+        g.gain.linearRampToValueAtTime(0.05, t + note.time + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + note.time + 0.38);
+        osc.connect(g); g.connect(audioCtx.destination);
+        osc.start(t + note.time); osc.stop(t + note.time + 0.4);
+      });
+    };
+    playSequence(); musicInterval = setInterval(playSequence, 1600);
+  } else {
+    musicPlaying = false; btn.innerText = "🔇";
+    if (musicInterval) clearInterval(musicInterval);
+  }
+}
+
+/* --- GAME STATE --- */
+let gameState = "START", cameraX = 0, spaceDistance = 0, score = 0;
+const worldWidth = 6000;
+const characters = {
+  lori:     { type: 'png', right: "IMG_2161.png", left: "IMG_2162.png" },
+  man:      { type: 'emoji', right: "🏃🏻‍♂️‍➡️", left: "🏃🏻‍♂️" },
+  wc_man:   { type: 'emoji', right: "👨🏻‍🦽‍➡️", left: "👨🏻‍🦽" },
+  woman:    { type: 'emoji', right: "🏃🏼‍♀️‍➡️", left: "🏃🏼‍♀️" },
+  wc_woman: { type: 'emoji', right: "👩🏽‍🦽‍➡️", left: "👩🏽‍🦽" }
+};
+let selectedChar = null;
+const imgRight = new Image(), imgLeft = new Image();
+
+function showHighScore() {
+  const hs = localStorage.getItem('maxRealityHS') || 0;
+  document.getElementById('high-score-display').innerText = "BEST MISSION SCORE: " + hs;
+}
+showHighScore();
+
+function selectChar(key) {
+  selectedChar = characters[key];
+  if (selectedChar.type === 'png') { imgRight.src = selectedChar.right; imgLeft.src = selectedChar.left; }
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('controls').style.display = 'flex';
+  document.getElementById('stats').style.display = 'block';
+  score = 0; resetEarth();
+}
+
+function returnToTitle(msg = "SELECT YOUR CHARACTER", color = "white") {
+    const hs = localStorage.getItem('maxRealityHS') || 0;
+    if(score > hs) localStorage.setItem('maxRealityHS', score);
+    gameState = "START";
+    document.getElementById('overlay').style.display = 'flex';
+    document.getElementById('controls').style.display = 'none';
+    document.getElementById('stats').style.display = 'none';
+    document.getElementById('overlay-msg').innerText = msg;
+    document.getElementById('overlay-msg').style.color = color;
+    showHighScore();
+}
+
+const ROAD_H = 120, GRASS_H = 140;
+let groundY, treeY;
+const player = { x: 300, y: 0, vy: 0, jumping: false, dir: "right", speed: 7, isBeingAbducted: false, collisionTimer: 0, fuel: 100 };
+const ufo = { state: "WAITING", x: 0, y: 100, size: 0, targetX: 4465, timer: 0, beamAlpha: 0 };
+const stars = Array.from({length: 100}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 400, emoji: "⭐" }));
+const buildings = Array.from({length: 12}, (_, i) => ({ x: i * 350, emoji: ["🏢", "🏬", "🏭", "🏨", "🏦"][i % 5] }));
+const fuelTanks = Array.from({length: 8}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 500, collected: false }));
+const asteroids = Array.from({length: 25}, () => ({ x: Math.random() * worldWidth, y: Math.random() * 600, emoji: "🪨" }));
+const farm = [{ emoji: "🏠", x: 4450, y: 0, h: 100 }, { emoji: "🐄", x: 4465, y: 0, h: 50, abducted: false }];
+
+function resize() {
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  groundY = canvas.height - ROAD_H - 50; treeY = canvas.height - ROAD_H - GRASS_H;
+  // FIX THE HOUSE POSITION ON RESIZE
+  farm[0].y = treeY + 30;
+}
+window.addEventListener("resize", resize); resize();
+
+function resetEarth() {
+  gameState = "EARTH"; player.isBeingAbducted = false; player.y = groundY; player.fuel = 100;
+  spaceDistance = 0; ufo.state = "WAITING"; ufo.timer = 0; ufo.size = 0;
+  farm[1].y = treeY + 100; farm[1].abducted = false; farm[0].y = treeY + 30;
+  fuelTanks.forEach(t => t.collected = false);
+  document.getElementById('fuelContainer').style.display = 'none';
+}
+
+let keys = { left: false, right: false, jump: false };
+function bind(id, k) {
+  const btn = document.getElementById(id);
+  btn.onmousedown = btn.ontouchstart = (e) => { e.preventDefault(); keys[k] = true; };
+  btn.onmouseup = btn.ontouchend = btn.onmouseleave = (e) => { e.preventDefault(); keys[k] = false; };
+}
+bind("left", "left"); bind("right", "right"); bind("jump", "jump");
+
+function update() {
+  if (gameState === "START") return;
+  document.getElementById('scoreVal').innerText = score;
+  if (gameState === "EARTH") {
+    if (keys.left && !player.isBeingAbducted) { player.x -= player.speed; player.dir = "left"; }
+    if (keys.right && !player.isBeingAbducted) { player.x += player.speed; player.dir = "right"; }
+    if (player.x < 0) player.x = worldWidth; if (player.x > worldWidth) player.x = 0;
+    if (player.isBeingAbducted) {
+      player.x += (ufo.x + (ufo.size/2) - player.x - 30) * 0.1; player.y -= 3;
+      if (player.y < ufo.y + 20) { gameState = "SPACE"; score += 50; document.getElementById('fuelContainer').style.display = 'block'; }
+    } else {
+      if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
+      player.vy += 0.8; player.y += player.vy;
+      if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
+    }
+    ufo.timer++;
+    if (ufo.state === "WAITING" && ufo.timer > 300) { ufo.state = "INBOUND"; ufo.x = player.x + 800; ufo.size = 50; }
+    if (ufo.state === "INBOUND") { ufo.x -= 4; ufo.size = Math.min(115, ufo.size + 0.5); if (ufo.x <= ufo.targetX) ufo.state = "ABDUCTING"; }
+    if (ufo.state === "ABDUCTING") {
+      ufo.beamAlpha = Math.min(0.4, ufo.beamAlpha + 0.02);
+      if (Math.abs(player.x - (ufo.x + ufo.size/2)) < 65 && !player.jumping) player.isBeingAbducted = true;
+      if (!farm[1].abducted) { farm[1].y -= 2; if (farm[1].y < ufo.y + 40) { farm[1].abducted = true; ufo.timer = 0; score += 10; }
+      } else if (ufo.timer > 120 && !player.isBeingAbducted) ufo.state = "OUTBOUND";
+    }
+    if (ufo.state === "OUTBOUND") { ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.05); ufo.x -= 6; ufo.size -= 0.5; if (ufo.size <= 0) ufo.state = "WAITING"; }
+  } else {
+    spaceDistance += player.speed;
+    if (keys.left) { player.x -= player.speed; player.dir = "left"; }
+    if (keys.right) { player.x += player.speed; player.dir = "right"; }
+    if (player.x < 0) player.x = worldWidth; if (player.x > worldWidth) player.x = 0;
+    if (keys.jump && player.fuel > 0) { player.vy -= 1.0; player.fuel -= 0.4; }
+    player.vy += 0.3; player.y += player.vy; player.vy *= 0.96;
+    document.getElementById('fuelBar').style.width = player.fuel + '%';
+    if (player.fuel <= 0 && player.y >= canvas.height - 10) returnToTitle("MISSION FAILED - OUT OF FUEL", "#ff00ff");
+    fuelTanks.forEach(t => { if (!t.collected && Math.abs((player.x % worldWidth) - t.x) < 40 && Math.abs(player.y - t.y) < 40) { t.collected = true; player.fuel = Math.min(100, player.fuel + 40); score += 15; } });
+    asteroids.forEach(a => { let dx = (player.x % worldWidth) - a.x, dy = player.y - a.y; if (Math.sqrt(dx*dx + dy*dy) < 40 && player.collisionTimer === 0) { player.collisionTimer = 30; player.vy = 8; score = Math.max(0, score - 10); } });
+    if (player.collisionTimer > 0) player.collisionTimer--;
+    if (player.y > canvas.height) player.y = canvas.height;
+    if (spaceDistance > 5000 && Math.abs((player.x % worldWidth) - 1000) < 150) { score += 500; returnToTitle("MISSION SUCCESS! PORTAL REACHED", "#00ff00"); }
+  }
+  cameraX = player.x - canvas.width / 2;
+}
+
+function draw() {
+  if (gameState === "START") return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (gameState === "EARTH") {
+    ctx.fillStyle = "#020a2a"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const offsets = [-worldWidth, 0, worldWidth];
+    offsets.forEach(off => {
+      ctx.font = "80px serif"; ctx.fillText("🌖", 200 + off - cameraX * 0.2, 120);
+      stars.forEach(s => { ctx.font = "16px serif"; ctx.fillText(s.emoji, s.x + off - cameraX * 0.1, s.y); });
+      ctx.fillStyle = "#2f7d32"; ctx.fillRect(off - cameraX, treeY, worldWidth, GRASS_H);
+      ctx.fillStyle = "#333"; ctx.fillRect(off - cameraX, groundY + 20, worldWidth, ROAD_H);
+      buildings.forEach(b => { ctx.font = "100px serif"; ctx.fillText(b.emoji, b.x + off - cameraX, treeY + 30); });
+      for(let i=0; i<40; i++) { ctx.font = "70px serif"; ctx.fillText("🌲", (i*150) + off - cameraX, treeY + 30); }
+      farm.forEach(f => { if (!f.abducted) { ctx.font = f.h + "px serif"; ctx.fillText(f.emoji, f.x + off - cameraX, f.y); } });
+    });
+    if (ufo.size > 1) {
+      // New Pulsing Cyber-Beam
+if (ufo.beamAlpha > 0 && ufo.state === "ABDUCTING") {
+    ctx.save();
+    // Create a flickering effect
+    const flicker = Math.random() > 0.1 ? ufo.beamAlpha : 0.05; 
+    const grad = ctx.createLinearGradient(0, ufo.y, 0, groundY + 100);
+    
+    grad.addColorStop(0, `rgba(0, 242, 255, ${flicker})`);
+    grad.addColorStop(0.5, `rgba(188, 19, 254, ${flicker * 0.5})`); // Add some purple!
+    grad.addColorStop(1, "rgba(0, 242, 255, 0)");
+
+    ctx.fillStyle = grad;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00f2ff";
+    
+    ctx.beginPath();
+    ctx.moveTo(ufo.x - cameraX + ufo.size/2, ufo.y + ufo.size/2);
+    ctx.lineTo(ufo.x - cameraX - 80, groundY + 100);
+    ctx.lineTo(ufo.x - cameraX + ufo.size + 80, groundY + 100);
+    ctx.fill();
+    ctx.restore();
+}
+
+      ctx.font = ufo.size + "px serif"; ctx.fillText("🛸", ufo.x - cameraX, ufo.y + (ufo.size/2));
+    }
+  } else {
+    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for(let i=-1; i<2; i++) {
+        let off = i * worldWidth;
+        ctx.font = "120px serif"; ctx.fillText("🪐", 500 + off - cameraX * 0.3, 200);
+        ctx.font = "60px serif"; ctx.fillText("🌍", 2500 + off - cameraX * 0.4, 400);
+        stars.forEach(s => { ctx.font = "16px serif"; ctx.fillText(s.emoji, s.x + off - cameraX, s.y); });
+        asteroids.forEach(a => { ctx.font = "40px serif"; ctx.fillText(a.emoji, a.x + off - cameraX, a.y); });
+        fuelTanks.forEach(f => { if(!f.collected) { ctx.font = "30px serif"; ctx.fillText("🔋", f.x + off - cameraX, f.y); } });
+    }
+    if (spaceDistance > 4000) { ctx.font = "120px serif"; ctx.fillText("🌀", 1000 - (cameraX % worldWidth), canvas.height/2); }
+  }
+  if (selectedChar.type === 'png') {
+    const img = (player.dir === "right") ? imgRight : imgLeft;
+    if (img.complete) ctx.drawImage(img, player.x - cameraX - 30, player.y - 60, 60, 60);
+  } else {
+    ctx.font = "50px serif"; ctx.fillText((player.dir === "right") ? selectedChar.right : selectedChar.left, player.x - cameraX - 25, player.y);
+  }
+  if (player.collisionTimer > 0) { ctx.font = "50px serif"; ctx.fillText("💥", player.x - cameraX - 25, player.y - 30); }
+  else if (gameState === "SPACE" && keys.jump && player.fuel > 0) { ctx.font = "30px serif"; ctx.fillText("🔥", player.x - cameraX - 15, player.y + 10); }
+}
+
+function loop() { update(); draw(); requestAnimationFrame(loop); }
+loop();
+</script>
+</body>
+</html>
