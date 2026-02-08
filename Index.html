@@ -7,28 +7,24 @@
 <style>
   html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: 'Courier New', monospace; color: white; }
   canvas { display: block; }
-  #ui { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.9); z-index: 100; text-align: center; }
+  #ui { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.9); z-index: 100; }
   .char-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
-  .char-btn { padding: 10px; background: #111; border: 2px solid #0ff; border-radius: 15px; cursor: pointer; }
+  .char-btn { padding: 10px; background: #111; border: 2px solid #0ff; border-radius: 15px; cursor: pointer; text-align: center; }
   .char-btn img { width: 60px; height: 60px; object-fit: contain; }
   #controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: none; gap: 20px; z-index: 100; }
   .ctrl { width: 75px; height: 75px; background: rgba(255,0,255,0.2); border: 2px solid #f0f; color: white; font-size: 35px; border-radius: 50%; touch-action: manipulation; }
-  #stats { position: fixed; top: 20px; right: 20px; font-size: 22px; color: #0ff; display: none; text-shadow: 0 0 5px #0ff; }
 </style>
 </head>
 <body>
 
 <div id="ui">
-  <h1 style="color:#f0f; text-shadow: 0 0 10px #f0f; font-size: 2.5rem;">MAXIMUM REALITY</h1>
-  <p style="color:#0ff;">CYBERPUNK ABDUCTION</p>
+  <h1 style="color:#f0f; text-shadow: 0 0 10px #f0f;">MAXIMUM REALITY</h1>
   <div class="char-grid">
-    <div class="char-btn" onclick="launch('lori')"><img src="lori.png"><p>LORI</p></div>
-    <div class="char-btn" onclick="launch('azul')"><img src="azul_sitting.png"><p>AZUL</p></div>
-    <div class="char-btn" onclick="launch('skater')"><img src="mochkil-skate.png"><p>SKATER</p></div>
+    <div class="char-btn" onclick="start('lori')"><img src="lori.png"><p>LORI</p></div>
+    <div class="char-btn" onclick="start('azul')"><img src="azul_sitting.png"><p>AZUL</p></div>
+    <div class="char-btn" onclick="start('skater')"><img src="mochkil-skate.png"><p>SKATER</p></div>
   </div>
 </div>
-
-<div id="stats">XP: <span id="score">0</span></div>
 
 <div id="controls">
   <button class="ctrl" id="lBtn">⬅️</button>
@@ -42,63 +38,44 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-// --- ASSET REPOSITORY ---
-const imgObj = {};
-const sources = {
-    sky: "gg-bg.png",
-    floor: "floor.png",
-    tank: "cardboard_tank.png",
-    bldA: "building-a.png",
-    bldB: "building-b.png",
-    bldC: "building-c.png",
-    ufo: "Mochkil-caught.png",
-    lori: "lori.png",
-    azul: "azul_sitting.png",
-    skater: "mochkil-skate.png",
-    loriRun: ["Lori-run.png", "Lori-run2.png", "Lori-run3.png"],
-    azulRun: ["Azul-run.png", "Azul-run2.png", "Azul-run3.png"]
-};
+// --- YOUR ASSET LOGIC ---
+const assets = {};
+const toLoad = ['gg-bg.png', 'building-a.png', 'building-b.png', 'building-c.png', 'building-d.png', 'floor.png', 'cardboard_tank.png', 'Mochkil-caught.png'];
+// Individual characters and runs
+const extras = ['lori.png', 'azul_sitting.png', 'mochkil-skate.png', 'Lori-run.png', 'Lori-run2.png', 'Lori-run3.png', 'Azul-run.png', 'Azul-run2.png', 'Azul-run3.png'];
 
-function loadAll() {
-    for (let k in sources) {
-        if (Array.isArray(sources[k])) {
-            imgObj[k] = sources[k].map(s => { let i = new Image(); i.src = s; return i; });
-        } else {
-            imgObj[k] = new Image(); imgObj[k].src = sources[k];
-        }
-    }
-}
+[...toLoad, ...extras].forEach(src => {
+    assets[src] = new Image();
+    assets[src].src = src; 
+});
 
-// --- GAME VARS ---
 let p = { x: 500, y: 0, vy: 0, dir: "right", char: 'lori', jump: false },
     keys = { l: false, r: false }, camX = 0, gY = 0, frame = 0, active = false;
 
-let tank = { x: 1500, speed: -2.5 }; // Negative speed to move WEST while you move EAST
-let buildings = [];
+let tank = { x: 1200, speed: -3 }; // Moves West while you move East
 
-function launch(key) {
+function start(key) {
     p.char = key;
     document.getElementById('ui').style.display = 'none';
     document.getElementById('controls').style.display = 'flex';
-    document.getElementById('stats').style.display = 'block';
-    gY = window.innerHeight - 150; 
-    p.y = gY;
-    
-    // Seed buildings
-    for(let i=0; i<20; i++) {
-        buildings.push({ x: i * 400, type: ['bldA', 'bldB', 'bldC'][Math.floor(Math.random()*3)] });
-    }
-    
     active = true;
-    loadAll();
+    resize();
     requestAnimationFrame(loop);
 }
 
-// Input Handlers
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    gY = canvas.height - 160; 
+    p.y = gY;
+}
+window.addEventListener('resize', resize);
+
+// Inputs
 const bind = (id, k, t) => {
     document.getElementById(id).addEventListener(t, (e) => {
         e.preventDefault();
-        if (k === 'j') { if(!p.jump){ p.vy = -20; p.jump = true; } }
+        if (k === 'j') { if(!p.jump){ p.vy = -22; p.jump = true; } }
         else { keys[k] = (t === 'touchstart'); }
     });
 };
@@ -109,55 +86,57 @@ bind('jBtn','j','touchstart');
 function loop() {
     if (!active) return;
 
-    // Movement logic
     if (keys.l) { p.x -= 8; p.dir = "left"; frame += 0.2; }
     if (keys.r) { p.x += 8; p.dir = "right"; frame += 0.2; }
-    p.vy += 1.1; p.y += p.vy;
+    p.vy += 1.2; p.y += p.vy;
     if (p.y > gY) { p.y = gY; p.vy = 0; p.jump = false; }
     
-    // Tank logic - making it drive independently
+    // Tank logic
     tank.x += tank.speed;
-    if (tank.x < p.x - 1000) tank.x = p.x + 1000;
+    if (tank.x < p.x - 1000) tank.x = p.x + 1500;
 
     camX = p.x - window.innerWidth / 2;
-    document.getElementById('score').innerText = Math.floor(p.x/10);
 
-    // DRAWING
     ctx.clearRect(0,0,canvas.width, canvas.height);
 
-    // 1. Parallax Sky
-    if (imgObj.sky?.complete) {
-        ctx.drawImage(imgObj.sky, 0, 0, canvas.width, canvas.height);
+    // 1. SKY (Parallax)
+    if (assets['gg-bg.png'].complete) {
+        let skyX = -(camX * 0.1) % canvas.width;
+        ctx.drawImage(assets['gg-bg.png'], skyX, 0, canvas.width, canvas.height);
+        ctx.drawImage(assets['gg-bg.png'], skyX + canvas.width, 0, canvas.width, canvas.height);
     }
 
-    // 2. Buildings
-    buildings.forEach(b => {
-        let bImg = imgObj[b.type];
-        if (bImg?.complete) {
-            ctx.drawImage(bImg, b.x - (camX * 0.4), gY - 350, 350, 450);
+    // 2. BUILDINGS (Middle Layer)
+    const blds = ['building-a.png', 'building-b.png', 'building-c.png', 'building-d.png'];
+    blds.forEach((name, i) => {
+        if (assets[name].complete) {
+            let bX = (i * 600) - (camX * 0.5);
+            ctx.drawImage(assets[name], bX, gY - 350, 400, 500);
         }
     });
 
-    // 3. Tank
-    if (imgObj.tank?.complete) {
-        ctx.drawImage(imgObj.tank, tank.x - camX, gY - 40, 220, 150);
+    // 3. TANK (Road Object)
+    if (assets['cardboard_tank.png'].complete) {
+        ctx.drawImage(assets['cardboard_tank.png'], tank.x - camX, gY - 60, 220, 160);
     }
 
-    // 4. Infinite Floor
-    if (imgObj.floor?.complete) {
-        let fWidth = 128;
-        let startX = Math.floor(camX / fWidth) * fWidth;
-        for (let x = startX - fWidth; x < startX + canvas.width + fWidth; x += fWidth) {
-            ctx.drawImage(imgObj.floor, x - camX, gY + 80, fWidth, fWidth);
+    // 4. FLOOR (Covering Layer)
+    if (assets['floor.png'].complete) {
+        let fW = 128;
+        let fX = -camX % fW;
+        for (let i = -1; i < (canvas.width / fW) + 2; i++) {
+            ctx.drawImage(assets['floor.png'], (i * fW) + fX, gY + 80, fW, fW);
         }
     }
 
-    // 5. Hero
-    let set = p.char === 'lori' ? imgObj.loriRun : imgObj.azulRun;
-    let idle = p.char === 'skater' ? imgObj.skater : imgObj[p.char];
-    let drawImg = (keys.l || keys.r) && set ? set[Math.floor(frame % 3)] : idle;
+    // 5. CHARACTER
+    let runSet = p.char === 'lori' ? ['Lori-run.png', 'Lori-run2.png', 'Lori-run3.png'] : ['Azul-run.png', 'Azul-run2.png', 'Azul-run3.png'];
+    let idle = p.char === 'lori' ? 'lori.png' : (p.char === 'azul' ? 'azul_sitting.png' : 'mochkil-skate.png');
+    
+    let drawImgName = (keys.l || keys.r) ? runSet[Math.floor(frame % 3)] : idle;
+    let drawImg = assets[drawImgName];
 
-    if (drawImg?.complete) {
+    if (drawImg && drawImg.complete) {
         ctx.save();
         ctx.translate(p.x - camX, p.y - 10);
         if (p.dir === "left") ctx.scale(-1, 1);
@@ -167,9 +146,6 @@ function loop() {
 
     requestAnimationFrame(loop);
 }
-
-window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 </script>
 </body>
 </html>
