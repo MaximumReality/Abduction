@@ -5,25 +5,24 @@
 <title>MAXIMUM REALITY: Abduction 2.0</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
-  html, body { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: 'Courier New', monospace; color: white; }
-  canvas { display: block; width: 100vw; height: 100vh; }
-  #ui-layer { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); z-index: 100; }
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #050505; font-family: 'Courier New', monospace; color: white; }
+  canvas { display: block; }
+  #ui { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.85); z-index: 100; text-align: center; }
   .btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; }
-  .char-btn { padding: 10px; background: #222; border: 2px solid #ff00ff; border-radius: 10px; text-align: center; }
-  .char-btn img { width: 50px; height: 50px; display: block; margin: 0 auto; }
-  #controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: none; gap: 20px; }
-  .ctrl { width: 70px; height: 70px; background: rgba(0,255,255,0.3); border: 2px solid #0ff; color: white; font-size: 30px; border-radius: 15px; }
+  .char-btn { padding: 10px; background: #111; border: 2px solid #0ff; border-radius: 10px; cursor: pointer; font-size: 10px; }
+  .char-btn img { width: 50px; height: 50px; display: block; margin-bottom: 5px; }
+  #controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: none; gap: 15px; }
+  .ctrl { width: 70px; height: 70px; background: rgba(255,0,255,0.2); border: 2px solid #f0f; color: white; font-size: 30px; border-radius: 50%; touch-action: manipulation; }
 </style>
 </head>
 <body>
 
-<div id="ui-layer">
-  <h1 style="color:#ff00ff; text-shadow: 0 0 10px #ff00ff;">MAXIMUM REALITY</h1>
-  <p>If images don't load, check file names!</p>
+<div id="ui">
+  <h1 style="color:#f0f; text-shadow: 0 0 10px #f0f;">MAXIMUM REALITY</h1>
   <div class="btn-grid">
-    <div class="char-btn" onclick="initGame('lori')"><img src="lori.png">LORI</div>
-    <div class="char-btn" onclick="initGame('azul')"><img src="azul_sitting.png">AZUL</div>
-    <div class="char-btn" onclick="initGame('skater')"><img src="mochkil-skate.png">SKATE</div>
+    <div class="char-btn" onclick="go('lori')"><img src="lori.png">LORI</div>
+    <div class="char-btn" onclick="go('azul')"><img src="azul_sitting.png">AZUL</div>
+    <div class="char-btn" onclick="go('skater')"><img src="mochkil-skate.png">SKATE</div>
   </div>
 </div>
 
@@ -38,120 +37,91 @@
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
-// --- ASSET SETUP ---
-const images = {};
+const imgs = {};
 const sources = {
-    sky: "gg-bg.png",
-    floor: "floor.png",
-    tank: "cardboard_tank.png",
-    lori: "lori.png",
-    azul: "azul_sitting.png",
-    skater: "mochkil-skate.png",
-    loriRun: ["Lori-run.png", "Lori-run2.png", "Lori-run3.png"],
-    azulRun: ["Azul-run.png", "Azul-run2.png", "Azul-run3.png"]
+    sky: "gg-bg.png", floor: "floor.png", tank: "cardboard_tank.png",
+    bld: "building-c.png", lori: "lori.png", azul: "azul_sitting.png",
+    skate: "mochkil-skate.png",
+    lRun: ["Lori-run.png", "Lori-run2.png", "Lori-run3.png"],
+    aRun: ["Azul-run.png", "Azul-run2.png", "Azul-run3.png"]
 };
 
-// Simplified loader that doesn't block the game
-function loadImages() {
-    for (let key in sources) {
-        if (Array.isArray(sources[key])) {
-            images[key] = sources[key].map(src => {
-                let img = new Image(); img.src = src; return img;
-            });
-        } else {
-            images[key] = new Image(); images[key].src = sources[key];
-        }
+function load() {
+    for (let k in sources) {
+        if (Array.isArray(sources[k])) imgs[k] = sources[k].map(s => { let i = new Image(); i.src = s; return i; });
+        else { imgs[k] = new Image(); imgs[k].src = sources[k]; }
     }
 }
 
-let player = { x: 200, y: 0, vy: 0, dir: "right", char: 'lori', jumping: false };
-let keys = { left: false, right: false };
-let cameraX = 0, groundY = 0, frame = 0, isRunning = false;
+let p = { x: 300, y: 0, vy: 0, dir: "right", char: 'lori', jump: false },
+    keys = { l: false, r: false }, camX = 0, gY = 0, frame = 0, live = false;
 
-function initGame(charKey) {
-    player.char = charKey;
-    document.getElementById('ui-layer').style.display = 'none';
+function go(key) {
+    p.char = key;
+    document.getElementById('ui').style.display = 'none';
     document.getElementById('controls').style.display = 'flex';
-    groundY = window.innerHeight - 120;
-    player.y = groundY;
-    isRunning = true;
-    loadImages();
-    requestAnimationFrame(gameLoop);
+    gY = window.innerHeight - 130;
+    p.y = gY;
+    live = true;
+    load();
+    requestAnimationFrame(loop);
 }
 
-// Touch controls for iPhone
-const handleTouch = (id, key, type) => {
+const tap = (id, k, t) => {
     const el = document.getElementById(id);
-    el.addEventListener(type, (e) => {
+    el.addEventListener(t, (e) => {
         e.preventDefault();
-        if (key === 'jump') { if(!player.jumping) { player.vy = -18; player.jumping = true; } }
-        else { keys[key] = (type === 'touchstart'); }
+        if (k === 'j') { if(!p.jump){ p.vy = -18; p.jump = true; } }
+        else { keys[k] = (t === 'touchstart'); }
     });
 };
-handleTouch('lBtn', 'left', 'touchstart'); handleTouch('lBtn', 'left', 'touchend');
-handleTouch('rBtn', 'right', 'touchstart'); handleTouch('rBtn', 'right', 'touchend');
-handleTouch('jBtn', 'jump', 'touchstart');
+tap('lBtn','l','touchstart'); tap('lBtn','l','touchend');
+tap('rBtn','r','touchstart'); tap('rBtn','r','touchend');
+tap('jBtn','j','touchstart');
 
-function gameLoop() {
-    if (!isRunning) return;
+function loop() {
+    if (!live) return;
+    if (keys.l) { p.x -= 7; p.dir = "left"; frame += 0.2; }
+    if (keys.r) { p.x += 7; p.dir = "right"; frame += 0.2; }
+    p.vy += 0.8; p.y += p.vy;
+    if (p.y > gY) { p.y = gY; p.vy = 0; p.jump = false; }
+    camX = p.x - window.innerWidth / 2;
 
-    // Physics
-    if (keys.left) { player.x -= 6; player.dir = "left"; frame += 0.15; }
-    if (keys.right) { player.x += 6; player.dir = "right"; frame += 0.15; }
+    ctx.fillStyle = "#050505"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Sky
+    if (imgs.sky?.complete) ctx.drawImage(imgs.sky, 0, 0, canvas.width, canvas.height);
     
-    player.vy += 0.8;
-    player.y += player.vy;
-    if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
-    
-    cameraX = player.x - window.innerWidth / 2;
-
-    // Draw
-    ctx.fillStyle = "#111"; // Background fallback
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    if (images.sky && images.sky.complete) ctx.drawImage(images.sky, 0, 0, canvas.width, canvas.height);
-
-    // Draw Floor
-    if (images.floor && images.floor.complete) {
-        let fX = -cameraX % 128;
-        for (let i = -1; i < (canvas.width / 128) + 2; i++) {
-            ctx.drawImage(images.floor, (i * 128) + fX, groundY + 40, 128, 128);
-        }
-    } else {
-        ctx.fillStyle = "#333";
-        ctx.fillRect(0, groundY + 40, canvas.width, 100);
+    // 2. City Parallax
+    if (imgs.bld?.complete) {
+        for(let i=0; i<10; i++) ctx.drawImage(imgs.bld, (i*400) - (camX*0.3), gY-300, 300, 400);
     }
 
-    // Draw Player
-    let runSet = player.char === 'lori' ? images.loriRun : images.azulRun;
-    let pImg = (keys.left || keys.right) ? runSet[Math.floor(frame % 3)] : images[player.char];
+    // 3. Tank
+    if (imgs.tank?.complete) ctx.drawImage(imgs.tank, 1200 - camX, gY - 60, 180, 130);
 
-    if (pImg && pImg.complete) {
+    // 4. Floor
+    if (imgs.floor?.complete) {
+        let fX = -camX % 128;
+        for (let i = -1; i < (canvas.width / 128) + 2; i++) ctx.drawImage(imgs.floor, (i*128)+fX, gY+40, 128, 128);
+    }
+
+    // 5. Player
+    let run = p.char === 'lori' ? imgs.lRun : imgs.aRun;
+    let charImg = (keys.l || keys.r) ? run[Math.floor(frame % 3)] : imgs[p.char==='skater'?'skate':p.char];
+
+    if (charImg?.complete) {
         ctx.save();
-        if (player.dir === "left") {
-            ctx.translate(player.x - cameraX + 40, 0); ctx.scale(-1, 1);
-            ctx.drawImage(pImg, -40, player.y - 80, 80, 80);
-        } else {
-            ctx.drawImage(pImg, player.x - cameraX - 40, player.y - 80, 80, 80);
-        }
+        ctx.translate(p.x - camX + (p.dir==="left"?40:-40), p.y - 80);
+        if (p.dir === "left") ctx.scale(-1, 1);
+        ctx.drawImage(charImg, 0, 0, 80, 80);
         ctx.restore();
-    } else {
-        ctx.fillStyle = "#ff00ff"; // Pink box if image missing
-        ctx.fillRect(player.x - cameraX - 20, player.y - 40, 40, 40);
     }
-
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(loop);
 }
 
-// Ensure canvas is right size
-window.addEventListener('resize', () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-});
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
+window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+canvas.width = window.innerWidth; canvas.height = window.innerHeight;
 </script>
 </body>
 </html>
