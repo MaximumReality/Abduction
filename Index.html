@@ -19,7 +19,6 @@
   #controls { position: fixed; bottom: 10px; left: 50%; transform: translateX(-50%); display: none; gap: 10px; z-index: 100; align-items: center; }
   button { font-size: 24px; padding: 10px; border-radius: 12px; border: 1px solid rgba(0,255,255,0.5); background: rgba(255,255,255,0.1); color: #fff; backdrop-filter: blur(5px); touch-action: manipulation; width: 65px; height: 60px; }
   #restartBtn { background: rgba(255, 0, 255, 0.2); border-color: #ff00ff; }
-  #musicToggle { background: rgba(0, 255, 255, 0.1); border-color: #0ff; }
   #stats { position: fixed; top: 10px; right: 20px; text-align: right; z-index: 100; display: none; font-size: 18px; color: #0ff; }
   .home-btn { position: fixed; top: 16px; left: 16px; z-index: 2000; background: rgba(255, 0, 255, 0.8); color: #fff; padding: 8px 12px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; text-decoration: none; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
 </style>
@@ -70,9 +69,9 @@ const ASSETS_LIST = {
     rick: "rickroll.png",
     loriRun: ["Lori-run.png", "Lori-run2.png", "Lori-run3.png"],
     azulRun: ["Azul-run.png", "Azul-run2.png", "Azul-run3.png"],
-    // Kitchen Tools
     spatula: "spatula.png",
     whisk: "whisk.png",
+    tank: "cardboard-tank.png",
     pan: "frying-pan.png",
     bowl: "bowl.png"
 };
@@ -96,6 +95,7 @@ let droppedTools = [];
 const TOOL_KEYS = ["spatula", "whisk", "pan", "bowl"];
 const player = { x: 300, y: 0, vy: 0, speed: 7, jumping: false, dir: "right", moving: false };
 const ufo = { state: "WAITING", x: 0, y: 100, size: 120, targetX: 4465, timer: 0, beamAlpha: 0 };
+const tank = { x: 1500, speed: 2, width: 220, height: 160 };
 let selectedChar = null;
 const ROAD_H = 120;
 let groundY;
@@ -137,10 +137,12 @@ function update() {
     if (keys.jump && !player.jumping) { player.vy = -18; player.jumping = true; }
     player.vy += 0.8; player.y += player.vy;
     if (player.y > groundY) { player.y = groundY; player.vy = 0; player.jumping = false; }
-
+    
     updateUFO();
+    updateTank();
     
     cameraX = player.x - canvas.width / 2;
+    score = player.x / 10;
     document.getElementById('scoreVal').innerText = Math.floor(score);
 }
 
@@ -163,27 +165,35 @@ function updateUFO() {
     }
 }
 
+function updateTank() {
+    tank.x += tank.speed;
+    if (tank.x > player.x + 2000) tank.x = player.x - 1000; 
+}
+
 // --- DRAWING ---
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (gameState === "START") return;
 
-    // Parallax
+    // 1. Sky
     if (imgObj.sky.complete) ctx.drawImage(imgObj.sky, 0, 0, canvas.width, canvas.height);
     
-    // Far Buildings
+    // 2. Far Buildings
     let bCX = -(cameraX * 0.1) % 800;
-    for(let i=0; i<5; i++) ctx.drawImage(imgObj.buildingC, bCX + (i*800), groundY - 400, 400, 500);
+    for(let i=0; i<10; i++) ctx.drawImage(imgObj.buildingC, bCX + (i*800), groundY - 400, 400, 500);
 
-    // Rickroll Easter Egg
+    // 3. Rickroll Easter Egg
     const rickX = 2500;
     ctx.drawImage(imgObj.rick, rickX - cameraX, groundY - 20, 40, 40);
 
-    // Floor
+    // 4. THE TANK (Drawn before floor)
+    ctx.drawImage(imgObj.tank, tank.x - cameraX, groundY - 80, tank.width, tank.height);
+
+    // 5. Floor
     let fX = -cameraX % 128;
     for (let i = -1; i < (canvas.width / 128) + 2; i++) ctx.drawImage(imgObj.floor, (i * 128) + fX, groundY + 50, 128, 128);
 
-    // Tools
+    // 6. Kitchen Tools
     droppedTools.forEach((t, i) => {
         t.y += t.vy; t.rot += 0.1;
         ctx.save();
@@ -194,7 +204,7 @@ function draw() {
         if (t.y > canvas.height) droppedTools.splice(i, 1);
     });
 
-    // Beam
+    // 7. Beam & UFO
     if (ufo.state === "ABDUCTING") {
         ctx.fillStyle = `rgba(0, 255, 255, ${ufo.beamAlpha})`;
         ctx.beginPath(); ctx.moveTo(ufo.x - cameraX + 60, ufo.y + 60);
@@ -202,11 +212,9 @@ function draw() {
         ctx.fill();
         ctx.drawImage(imgObj.mochkilCaught, ufo.x - cameraX + 30, groundY - (ufo.timer % 200), 60, 80);
     }
-    
-    // UFO
     ctx.font = "80px serif"; ctx.fillText("🛸", ufo.x - cameraX, ufo.y + 60);
 
-    // Player
+    // 8. Player
     let charKey = (selectedChar === 'lori') ? 'loriRun' : 'azulRun';
     let currentImg = imgObj[charKey][Math.floor(frame)];
     ctx.save();
