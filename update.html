@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>!function(){const e=["maximumreality.github.io","maximumreality.xyz"];e.includes(window.location.hostname)||window.location.hostname.includes("localhost")||(document.documentElement.innerHTML='<body style="background:#000;color:#f0f;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-family:monospace;margin:0;"><h1 style="text-shadow:2px 2px #0ff">ACCESS DENIED</h1><p style="color:#0ff">[ REALITY COMPROMISED ]</p><p>Locked to MaximumReality.xyz</p><p style="font-size:.8rem;margin-top:20px">Ticket #404-POO: Unauthorized Mirror.</p></body>',window.stop())}();</script>
+<meta charset="UTF-8">
+<title>MAXIMUM REALITY: Abduction</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; touch-action: manipulation; }
+  html, body { overflow: hidden; background: #000; width: 100vw; height: 100vh; font-family: 'Share Tech Mono', 'Courier New', monospace; color: #fff; cursor: crosshair; }
+
+  /* CRT scanline overlay */
+  body::before { content: ''; position: fixed; inset: 0; background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.1) 2px, rgba(0,0,0,0.1) 4px); pointer-events: none; z-index: 9998; }
+  /* Vignette */
+  body::after { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.7) 100%); pointer-events: none; z-index: 9997; }
+
+  canvas { display: block; width: 100%; height: 100%; }
+
+  /* ===== OVERLAY / TITLE SCREEN ===== */
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,5,0.96);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 500; padding: 20px; text-align: center;
+    gap: 10px;
+  }
+  #overlay.hidden { display: none; }
+
+  .title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.8rem, 6vw, 3rem);
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: #ff00ff;
+    text-shadow: 0 0 10px #ff00ff, 0 0 30px #ff00ff, 0 0 60px #ff00ff88;
+    line-height: 1;
+  }
+  .title span { color: #00ffff; text-shadow: 0 0 10px #00ffff, 0 0 30px #00ffff, 0 0 60px #00ffff88; }
+  .subtitle {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(0.7rem, 2vw, 1rem);
+    letter-spacing: 8px;
+    color: #ff00ff;
+    text-shadow: 0 0 8px #ff00ff;
+    margin-top: -4px;
+  }
+
+  #header-img {
+    width: min(260px, 70vw); height: auto;
+    border: 2px solid #00ffff;
+    border-radius: 8px;
+    box-shadow: 0 0 20px #ff00ff, 0 0 40px #00ffff44;
+  }
+
+  #overlay-msg {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(0.75rem, 2.5vw, 1rem);
+    letter-spacing: 3px;
+    color: #00ffff;
+    text-shadow: 0 0 10px #00ffff;
+  }
+
+  /* Character grid */
+  .char-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 420px;
+    width: 100%;
+  }
+  .char-btn {
+    background: rgba(0,255,255,0.04);
+    border: 1px solid rgba(0,255,255,0.25);
+    border-radius: 10px;
+    padding: 12px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .char-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 40%, rgba(0,255,255,0.05));
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .char-btn:hover { border-color: #00ffff; box-shadow: 0 0 16px #00ffff44; transform: translateY(-2px); }
+  .char-btn:hover::before { opacity: 1; }
+  .char-btn:active { transform: scale(0.96); }
+  .char-btn img, .char-btn .char-emoji { width: 50px; height: 50px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 38px; }
+  .char-btn p { margin: 6px 0 0; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: #00ffff; }
+
+  .instruction {
+    font-size: 10px; letter-spacing: 2px;
+    color: rgba(255,0,255,0.6);
+    margin-top: 4px;
+  }
+  #high-score-display { font-size: 10px; letter-spacing: 2px; color: rgba(0,255,255,0.5); }
+
+  /* ===== HUD ===== */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: none;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 12px 70px 12px 70px;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .hud-block {
+    background: rgba(0,0,10,0.85);
+    border: 1px solid rgba(0,255,255,0.3);
+    padding: 6px 14px;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    box-shadow: 0 0 12px rgba(0,255,255,0.15);
+  }
+  .hud-label { font-size: 8px; letter-spacing: 3px; color: rgba(0,255,255,0.5); }
+  .hud-value { font-family: 'Orbitron', monospace; font-size: 18px; font-weight: 700; color: #00ffff; text-shadow: 0 0 10px #00ffff; }
+
+  /* Fuel bar */
+  #fuelContainer { display: none; }
+  #fuelTrack {
+    width: 120px; height: 8px;
+    background: rgba(0,255,255,0.1);
+    border: 1px solid rgba(0,255,255,0.3);
+    margin-top: 4px;
+    clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 4px 100%, 0 calc(100% - 4px));
+  }
+  #fuelBar { height: 100%; width: 100%; background: linear-gradient(90deg, #00ff88, #00ffff); box-shadow: 0 0 8px #00ffff; transition: width 0.1s, background 0.3s; }
+  #fuelBar.low { background: linear-gradient(90deg, #ff4400, #ff8800); box-shadow: 0 0 8px #ff4400; }
+
+  /* ===== HOME BUTTON ===== */
+  .home-btn {
+    position: fixed; top: 14px; left: 14px; z-index: 2000;
+    background: rgba(255,0,255,0.15);
+    border: 1px solid rgba(255,0,255,0.5);
+    color: #ff00ff;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-decoration: none;
+    text-shadow: 0 0 8px #ff00ff;
+    box-shadow: 0 0 12px rgba(255,0,255,0.2);
+    transition: all 0.2s;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  }
+  .home-btn:hover { background: rgba(255,0,255,0.3); box-shadow: 0 0 20px rgba(255,0,255,0.4); }
+
+  /* ===== MUSIC BUTTON ===== */
+  #musicToggle {
+    position: fixed; top: 14px; right: 14px; z-index: 2000;
+    background: rgba(0,255,255,0.08);
+    border: 1px solid rgba(0,255,255,0.3);
+    color: #00ffff;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px; letter-spacing: 2px;
+    cursor: pointer;
+    text-shadow: 0 0 8px #00ffff;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    transition: all 0.2s;
+  }
+  #musicToggle:hover { background: rgba(0,255,255,0.15); }
+
+  /* ===== RESTART BUTTON ===== */
+  #restartBtn {
+    position: fixed; top: 54px; right: 14px; z-index: 2000;
+    background: rgba(255,0,255,0.08);
+    border: 1px solid rgba(255,0,255,0.3);
+    color: #ff00ff;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px; letter-spacing: 2px;
+    cursor: pointer;
+    display: none;
+    text-shadow: 0 0 8px #ff00ff;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+    transition: all 0.2s;
+  }
+  #restartBtn:hover { background: rgba(255,0,255,0.2); }
+
+  /* ===== MOBILE JOYSTICK ===== */
+  #joystickZone {
+    position: fixed; bottom: 0; left: 0;
+    width: 50%; height: 42%;
+    z-index: 200; touch-action: none;
+    display: none;
+  }
+  #joystickBase {
+    position: absolute;
+    width: 100px; height: 100px; border-radius: 50%;
+    border: 2px solid rgba(0,255,255,0.3);
+    background: rgba(0,255,255,0.04);
+    box-shadow: 0 0 20px rgba(0,255,255,0.15);
+    display: none;
+    transform: translate(-50%,-50%);
+    pointer-events: none;
+  }
+  #joystickKnob {
+    position: absolute;
+    width: 42px; height: 42px; border-radius: 50%;
+    background: rgba(0,255,255,0.2);
+    border: 2px solid rgba(0,255,255,0.8);
+    box-shadow: 0 0 14px #00ffff;
+    transform: translate(-50%,-50%);
+    pointer-events: none;
+  }
+
+  /* Jump / fire button — right side */
+  #actionZone {
+    position: fixed; bottom: 0; right: 0;
+    width: 50%; height: 42%;
+    z-index: 200; touch-action: none;
+    display: none;
+    align-items: flex-end; justify-content: flex-end;
+    padding: 20px;
+  }
+  #jumpBtn {
+    width: 78px; height: 78px; border-radius: 50%;
+    border: 2px solid rgba(255,0,255,0.5);
+    background: rgba(255,0,255,0.08);
+    box-shadow: 0 0 20px rgba(255,0,255,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px; letter-spacing: 1px;
+    color: rgba(255,0,255,0.8);
+    pointer-events: none;
+  }
+
+  /* Show mobile controls only on touch devices */
+  @media (hover:none) and (pointer:coarse) {
+    #joystickZone, #actionZone { display: flex; }
+    #restartBtn { display: block; }
+  }
+
+  /* ===== WAVE ALERT ===== */
+  #waveAlert {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(24px, 5vw, 56px);
+    font-weight: 900;
+    color: #ff00ff;
+    text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff;
+    z-index: 300; pointer-events: none;
+    opacity: 0; letter-spacing: 4px; text-align: center;
+    transition: opacity 0.3s;
+  }
+</style>
+</head>
+<body>
+
+<a href="https://maximumreality.xyz/" class="home-btn">◂ HOME</a>
+<button id="musicToggle" onclick="toggleMusic()">🔇 SYNTH</button>
+<button id="restartBtn" onclick="returnToTitle()">↺ RESTART</button>
+
+<!-- TITLE / SELECT SCREEN -->
+<div id="overlay">
+  <div class="title">MAXIMUM <span>REALITY</span></div>
+  <div class="subtitle">ABDUCTION</div>
+  <img src="abduction.png" id="header-img" alt="Abduction">
+  <div id="overlay-msg">SELECT YOUR CHARACTER</div>
+  <div class="char-grid">
+    <div class="char-btn" onclick="selectChar('lori')">
+      <img src="lori.png" class="char-emoji" alt="Lori">
+      <p>Lori</p>
+    </div>
+    <div class="char-btn" onclick="selectChar('man')">
+      <div class="char-emoji">🏃🏻‍♂️</div><p>Man</p>
+    </div>
+    <div class="char-btn" onclick="selectChar('wc_man')">
+      <div class="char-emoji">👨🏻‍🦽</div><p>Wheelchair M</p>
+    </div>
+    <div class="char-btn" onclick="selectChar('woman')">
+      <div class="char-emoji">🧍🏼‍♀️</div><p>Woman</p>
+    </div>
+    <div class="char-btn" onclick="selectChar('wc_woman')">
+      <div class="char-emoji">👩🏽‍🦽‍➡️</div><p>Wheelchair W</p>
+    </div>
+  </div>
+  <div class="instruction">↺ = RESTART &nbsp;|&nbsp; 🔇 = SCI-FI SYNTH</div>
+  <div id="high-score-display"></div>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-block">
+    <div class="hud-label">SCORE</div>
+    <div class="hud-value" id="scoreVal">0</div>
+  </div>
+  <div class="hud-block" id="fuelContainer">
+    <div class="hud-label">FUEL</div>
+    <div id="fuelTrack"><div id="fuelBar"></div></div>
+  </div>
+  <div class="hud-block">
+    <div class="hud-label">BEST</div>
+    <div class="hud-value" id="bestVal">0</div>
+  </div>
+</div>
+
+<div id="waveAlert"></div>
+<canvas id="game"></canvas>
+
+<!-- MOBILE CONTROLS -->
+<div id="joystickZone">
+  <div id="joystickBase"><div id="joystickKnob"></div></div>
+</div>
+<div id="actionZone">
+  <div id="jumpBtn">JUMP<br>/ BOOST</div>
+</div>
+
+<script>
+// =====================================================
+// MAXIMUM REALITY: ABDUCTION — v2.0
+// Upgraded: clean structure, joystick, neon glow, physics
+// =====================================================
+
+const canvas  = document.getElementById('game');
+const ctx     = canvas.getContext('2d');
+
+// ==================== CONSTANTS ====================
+const WORLD_W   = 6000;
+const ROAD_H    = 120;
+const GRASS_H   = 140;
+const GRAVITY   = 0.55;       // smoother than original 0.8
+const JUMP_FORCE = -16;       // slightly less floaty
+const SPACE_GRAVITY = 0.25;   // gentle drift in space
+const PLAYER_SPEED  = 6;
+const UFO_BEAM_WIDTH = 70;
+
+// ==================== AUDIO ====================
+let audioCtx = null, musicInterval = null, musicPlaying = false;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playNote(freq, startTime, duration, type = 'sawtooth', vol = 0.05) {
+  const ac = getAudioCtx();
+  const osc = ac.createOscillator();
+  const g   = ac.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startTime);
+  g.gain.setValueAtTime(0, startTime);
+  g.gain.linearRampToValueAtTime(vol, startTime + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(g); g.connect(ac.destination);
+  osc.start(startTime); osc.stop(startTime + duration);
+}
+
+function playSequence() {
+  const t = getAudioCtx().currentTime;
+  const notes = [
+    { f: 110, t: 0.0 }, { f: 110, t: 0.4 },
+    { f: 130, t: 0.8 }, { f: 146, t: 1.2 }
+  ];
+  notes.forEach(n => playNote(n.f, t + n.t, 0.38));
+}
+
+function toggleMusic() {
+  const btn = document.getElementById('musicToggle');
+  if (!musicPlaying) {
+    musicPlaying = true;
+    btn.textContent = '🔊 SYNTH';
+    btn.style.borderColor = 'rgba(0,255,255,0.6)';
+    playSequence();
+    musicInterval = setInterval(playSequence, 1600);
+  } else {
+    musicPlaying = false;
+    btn.textContent = '🔇 SYNTH';
+    btn.style.borderColor = 'rgba(0,255,255,0.3)';
+    clearInterval(musicInterval);
+  }
+}
+
+// ==================== CHARACTERS ====================
+const CHARACTERS = {
+  lori:     { type: 'png',   right: 'IMG_2161.png', left: 'IMG_2162.png' },
+  man:      { type: 'emoji', right: '🏃🏻‍♂️‍➡️',        left: '🏃🏻‍♂️' },
+  wc_man:   { type: 'emoji', right: '👨🏻‍🦽‍➡️',         left: '👨🏻‍🦽' },
+  woman:    { type: 'emoji', right: '🏃🏼‍♀️‍➡️',        left: '🏃🏼‍♀️' },
+  wc_woman: { type: 'emoji', right: '👩🏽‍🦽‍➡️',         left: '👩🏽‍🦽' },
+};
+const imgRight = new Image(), imgLeft = new Image();
+let selectedChar = null;
+
+// ==================== GAME STATE ====================
+let gameState  = 'START';
+let score      = 0;
+let cameraX    = 0;
+let spaceDistance = 0;
+
+// Player
+const player = {
+  x: 300, y: 0, vy: 0,
+  onGround: false,
+  jumping: false,
+  dir: 'right',
+  speed: PLAYER_SPEED,
+  isBeingAbducted: false,
+  collisionTimer: 0,
+  fuel: 100,
+  // Visual
+  bobTimer: 0,
+};
+
+// UFO
+const ufo = {
+  state: 'WAITING',   // WAITING | INBOUND | ABDUCTING | OUTBOUND
+  x: 0, y: 100,
+  size: 0,
+  targetX: 4465,
+  timer: 0,
+  beamAlpha: 0,
+};
+
+// World objects
+const stars     = Array.from({length: 120}, () => ({ x: Math.random() * WORLD_W, y: Math.random() * 380, twinkle: Math.random() * Math.PI * 2 }));
+const buildings = Array.from({length: 14}, (_, i) => ({ x: i * 340, emoji: ['🏢','🏬','🏭','🏨','🏦'][i % 5] }));
+const fuelTanks = Array.from({length: 8}, () => ({ x: 300 + Math.random() * (WORLD_W - 600), y: 80 + Math.random() * 450, collected: false }));
+const asteroids = Array.from({length: 25}, () => ({ x: Math.random() * WORLD_W, y: Math.random() * 600, rot: 0, rotSpeed: (Math.random() - 0.5) * 0.04 }));
+const farm = [
+  { emoji: '🏠', x: 4450, y: 0, h: 100 },
+  { emoji: '🐄', x: 4465, y: 0, h: 50, abducted: false },
+];
+
+// Canvas sizing
+let groundY, treeY;
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  groundY = canvas.height - ROAD_H - 50;
+  treeY   = canvas.height - ROAD_H - GRASS_H;
+  farm[0].y = treeY + 30;
+  if (gameState !== 'SPACE' && !player.isBeingAbducted) player.y = groundY;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ==================== HIGH SCORE ====================
+function getHighScore() { return parseInt(localStorage.getItem('maxRealityHS') || '0'); }
+function saveHighScore() { if (score > getHighScore()) localStorage.setItem('maxRealityHS', score); }
+function showHighScore() {
+  document.getElementById('high-score-display').textContent = 'BEST MISSION: ' + getHighScore();
+  document.getElementById('bestVal').textContent = getHighScore();
+}
+showHighScore();
+
+// ==================== GAME FLOW ====================
+function selectChar(key) {
+  selectedChar = CHARACTERS[key];
+  if (selectedChar.type === 'png') {
+    imgRight.src = selectedChar.right;
+    imgLeft.src  = selectedChar.left;
+  }
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('hud').style.display = 'flex';
+  document.getElementById('restartBtn').style.display = 'block';
+  resetGame();
+}
+
+function resetGame() {
+  score = 0; spaceDistance = 0;
+  player.x = 300; player.y = groundY;
+  player.vy = 0; player.onGround = false;
+  player.isBeingAbducted = false;
+  player.fuel = 100; player.collisionTimer = 0;
+  ufo.state = 'WAITING'; ufo.timer = 0; ufo.size = 0; ufo.beamAlpha = 0;
+  farm[1].y = treeY + 100; farm[1].abducted = false;
+  farm[0].y = treeY + 30;
+  fuelTanks.forEach(t => t.collected = false);
+  document.getElementById('fuelContainer').style.display = 'none';
+  gameState = 'EARTH';
+  updateHUD();
+}
+
+function returnToTitle(msg = 'SELECT YOUR CHARACTER', color = '#00ffff') {
+  saveHighScore();
+  gameState = 'START';
+  document.getElementById('overlay').classList.remove('hidden');
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('restartBtn').style.display = 'none';
+  const el = document.getElementById('overlay-msg');
+  el.textContent = msg; el.style.color = color;
+  showHighScore();
+}
+
+function updateHUD() {
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('bestVal').textContent = getHighScore();
+  const pct = player.fuel;
+  document.getElementById('fuelBar').style.width = pct + '%';
+  document.getElementById('fuelBar').className = pct < 30 ? 'low' : '';
+}
+
+function showAlert(text) {
+  const el = document.getElementById('waveAlert');
+  el.textContent = text; el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 1800);
+}
+
+// ==================== KEYBOARD INPUT ====================
+const keys = { left: false, right: false, jump: false };
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft'  || k === 'a') keys.left  = true;
+  if (k === 'arrowright' || k === 'd') keys.right = true;
+  if (k === 'arrowup'    || k === 'w' || k === ' ') keys.jump = true;
+});
+window.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'arrowleft'  || k === 'a') keys.left  = false;
+  if (k === 'arrowright' || k === 'd') keys.right = false;
+  if (k === 'arrowup'    || k === 'w' || k === ' ') keys.jump = false;
+});
+
+// ==================== VIRTUAL JOYSTICK ====================
+const joystickZone = document.getElementById('joystickZone');
+const joystickBase = document.getElementById('joystickBase');
+const joystickKnob = document.getElementById('joystickKnob');
+const actionZone   = document.getElementById('actionZone');
+
+let joyActive = false, joyId = null;
+let joyOrigin = { x: 0, y: 0 };
+let joyVec    = { x: 0, y: 0 };
+const JOY_RADIUS = 46;
+
+joystickZone.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  joyId = t.identifier; joyActive = true;
+  joyOrigin = { x: t.clientX, y: t.clientY };
+  joystickBase.style.left = t.clientX + 'px';
+  joystickBase.style.top  = t.clientY + 'px';
+  joystickBase.style.display = 'block';
+  joystickKnob.style.left = '50px'; joystickKnob.style.top = '50px';
+}, { passive: false });
+
+joystickZone.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier !== joyId) continue;
+    const dx = t.clientX - joyOrigin.x;
+    const dy = t.clientY - joyOrigin.y;
+    const dist  = Math.min(Math.hypot(dx, dy), JOY_RADIUS);
+    const angle = Math.atan2(dy, dx);
+    joystickKnob.style.left = (50 + Math.cos(angle) * dist) + 'px';
+    joystickKnob.style.top  = (50 + Math.sin(angle) * dist) + 'px';
+    joyVec.x = Math.cos(angle) * (dist / JOY_RADIUS);
+    joyVec.y = Math.sin(angle) * (dist / JOY_RADIUS);
+  }
+}, { passive: false });
+
+function endJoy(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === joyId) {
+      joyActive = false; joyVec.x = 0; joyVec.y = 0;
+      joystickBase.style.display = 'none';
+    }
+  }
+}
+joystickZone.addEventListener('touchend',   endJoy, { passive: false });
+joystickZone.addEventListener('touchcancel',endJoy, { passive: false });
+
+// Action zone (jump / boost)
+actionZone.addEventListener('touchstart', e => { e.preventDefault(); keys.jump = true; },  { passive: false });
+actionZone.addEventListener('touchend',   e => { e.preventDefault(); keys.jump = false; }, { passive: false });
+actionZone.addEventListener('touchcancel',e => { e.preventDefault(); keys.jump = false; }, { passive: false });
+
+// ==================== UPDATE ====================
+function update() {
+  if (gameState === 'START') return;
+
+  // --- Movement input (keyboard + joystick) ---
+  let moveX = 0;
+  if (keys.left)  moveX -= 1;
+  if (keys.right) moveX += 1;
+  if (joyActive)  moveX = joyVec.x;
+
+  // --- EARTH phase ---
+  if (gameState === 'EARTH') {
+    if (!player.isBeingAbducted) {
+      player.x += moveX * player.speed;
+      if (moveX < -0.1) player.dir = 'left';
+      if (moveX >  0.1) player.dir = 'right';
+
+      // Jump
+      if (keys.jump && player.onGround) {
+        player.vy = JUMP_FORCE;
+        player.onGround = false;
+      }
+
+      // Also allow joystick up to jump
+      if (joyActive && joyVec.y < -0.6 && player.onGround) {
+        player.vy = JUMP_FORCE;
+        player.onGround = false;
+      }
+    } else {
+      // Being abducted — drift toward beam center
+      const beamCenterX = ufo.x + ufo.size / 2;
+      player.x += (beamCenterX - player.x - 20) * 0.08;
+      player.y -= 2.8;
+      player.dir = 'right';
+      if (player.y < ufo.y + 20) {
+        gameState = 'SPACE';
+        score += 50;
+        showAlert('ABDUCTED! +50');
+        document.getElementById('fuelContainer').style.display = 'block';
+      }
+    }
+
+    // Gravity & ground collision
+    player.vy += GRAVITY;
+    player.y  += player.vy;
+    if (player.y >= groundY) {
+      player.y = groundY; player.vy = 0; player.onGround = true;
+    } else {
+      player.onGround = false;
+    }
+
+    // Wrap world
+    if (player.x < 0)         player.x = WORLD_W;
+    if (player.x > WORLD_W)   player.x = 0;
+
+    // --- UFO logic ---
+    ufo.timer++;
+    if (ufo.state === 'WAITING' && ufo.timer > 300) {
+      ufo.state = 'INBOUND';
+      ufo.x = player.x + 900;
+      ufo.size = 50;
+    }
+    if (ufo.state === 'INBOUND') {
+      ufo.x    -= 3.5;
+      ufo.size  = Math.min(115, ufo.size + 0.4);
+      if (ufo.x <= ufo.targetX) ufo.state = 'ABDUCTING';
+    }
+    if (ufo.state === 'ABDUCTING') {
+      ufo.beamAlpha = Math.min(0.45, ufo.beamAlpha + 0.015);
+      const beamCX = ufo.x + ufo.size / 2;
+      if (Math.abs(player.x - beamCX) < UFO_BEAM_WIDTH && player.onGround) {
+        player.isBeingAbducted = true;
+      }
+      if (!farm[1].abducted) {
+        farm[1].y -= 1.8;
+        if (farm[1].y < ufo.y + 40) {
+          farm[1].abducted = true;
+          ufo.timer = 0;
+          score += 10;
+        }
+      } else if (ufo.timer > 120 && !player.isBeingAbducted) {
+        ufo.state = 'OUTBOUND';
+      }
+    }
+    if (ufo.state === 'OUTBOUND') {
+      ufo.beamAlpha = Math.max(0, ufo.beamAlpha - 0.04);
+      ufo.x    -= 5.5;
+      ufo.size -= 0.4;
+      if (ufo.size <= 0) { ufo.state = 'WAITING'; ufo.timer = 0; }
+    }
+
+  // --- SPACE phase ---
+  } else if (gameState === 'SPACE') {
+    spaceDistance += player.speed;
+
+    player.x += moveX * player.speed;
+    if (moveX < -0.1) player.dir = 'left';
+    if (moveX >  0.1) player.dir = 'right';
+    if (player.x < 0)       player.x = WORLD_W;
+    if (player.x > WORLD_W) player.x = 0;
+
+    // Boost (jump button = thruster)
+    if (keys.jump && player.fuel > 0) {
+      player.vy -= 0.9;
+      player.fuel = Math.max(0, player.fuel - 0.35);
+    }
+
+    // Also allow joystick up = boost
+    if (joyActive && joyVec.y < -0.5 && player.fuel > 0) {
+      player.vy -= 0.7;
+      player.fuel = Math.max(0, player.fuel - 0.28);
+    }
+
+    player.vy  += SPACE_GRAVITY;
+    player.vy  *= 0.97;           // drag — feels floaty and correct
+    player.y   += player.vy;
+    player.y    = Math.max(0, Math.min(canvas.height - 10, player.y));
+
+    // Fuel bar
+    updateHUD();
+    if (player.fuel <= 0 && player.y >= canvas.height - 15) {
+      returnToTitle('MISSION FAILED — OUT OF FUEL', '#ff4444');
+      return;
+    }
+
+    // Fuel tank pickups
+    fuelTanks.forEach(t => {
+      if (t.collected) return;
+      const px = player.x % WORLD_W;
+      if (Math.abs(px - t.x) < 40 && Math.abs(player.y - t.y) < 40) {
+        t.collected = true;
+        player.fuel = Math.min(100, player.fuel + 40);
+        score += 15;
+        showAlert('+FUEL +15');
+      }
+    });
+
+    // Asteroid collisions — AABB with coyote frames
+    asteroids.forEach(a => {
+      a.rot += a.rotSpeed;
+      const px = player.x % WORLD_W;
+      const dx = px - a.x, dy = player.y - a.y;
+      if (Math.sqrt(dx*dx + dy*dy) < 38 && player.collisionTimer === 0) {
+        player.collisionTimer = 40;
+        player.vy = 6;
+        score = Math.max(0, score - 10);
+        showAlert('IMPACT! -10');
+      }
+    });
+    if (player.collisionTimer > 0) player.collisionTimer--;
+
+    // Win condition
+    if (spaceDistance > 5000 && Math.abs((player.x % WORLD_W) - 1000) < 160) {
+      score += 500;
+      returnToTitle('MISSION SUCCESS! PORTAL REACHED! +500', '#00ff88');
+    }
+  }
+
+  // Player bob animation
+  if (player.onGround && Math.abs(moveX) > 0.1) player.bobTimer += 0.18;
+
+  // Score
+  document.getElementById('scoreVal').textContent = score;
+  cameraX = player.x - canvas.width / 2;
+}
+
+// ==================== DRAW HELPERS ====================
+function drawGlow(fn, color, blur = 16) {
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur  = blur;
+  fn();
+  ctx.restore();
+}
+
+function drawNeonLine(x1, y1, x2, y2, color, width = 1.5, blur = 10) {
+  drawGlow(() => {
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }, color, blur);
+}
+
+// ==================== DRAW ====================
+function draw() {
+  if (gameState === 'START') return;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (gameState === 'EARTH') drawEarth();
+  else                       drawSpace();
+
+  drawPlayer();
+}
+
+function drawEarth() {
+  // Sky gradient
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  sky.addColorStop(0, '#010820');
+  sky.addColorStop(0.6, '#020d35');
+  sky.addColorStop(1, '#041a20');
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const offsets = [-WORLD_W, 0, WORLD_W];
+
+  offsets.forEach(off => {
+    const ox = off - cameraX;
+
+    // Moon
+    drawGlow(() => {
+      ctx.font = '80px serif';
+      ctx.fillText('🌖', 200 + ox * 0.2, 120);
+    }, '#ffffff44', 20);
+
+    // Twinkling stars
+    stars.forEach((s, i) => {
+      s.twinkle += 0.03;
+      const alpha = 0.4 + 0.4 * Math.sin(s.twinkle);
+      ctx.globalAlpha = alpha;
+      ctx.font = '13px serif';
+      ctx.fillText('★', s.x + ox * 0.15, s.y);
+      ctx.globalAlpha = 1;
+    });
+
+    // Grass
+    const grassGrad = ctx.createLinearGradient(0, treeY, 0, treeY + GRASS_H);
+    grassGrad.addColorStop(0, '#1a4a1a');
+    grassGrad.addColorStop(1, '#0d2e0d');
+    ctx.fillStyle = grassGrad;
+    ctx.fillRect(ox, treeY, WORLD_W, GRASS_H);
+
+    // Road
+    const roadGrad = ctx.createLinearGradient(0, groundY, 0, groundY + ROAD_H);
+    roadGrad.addColorStop(0, '#1a1a1a');
+    roadGrad.addColorStop(1, '#0a0a0a');
+    ctx.fillStyle = roadGrad;
+    ctx.fillRect(ox, groundY + 20, WORLD_W, ROAD_H);
+
+    // Road dashes with neon glow
+    for (let i = 0; i < WORLD_W; i += 80) {
+      drawGlow(() => {
+        ctx.fillStyle = 'rgba(255,255,0,0.6)';
+        ctx.fillRect(ox + i, groundY + 40, 40, 4);
+      }, '#ffff00', 6);
+    }
+
+    // Trees with glow
+    for (let i = 0; i < 40; i++) {
+      ctx.font = '65px serif';
+      ctx.fillText('🌲', i * 150 + ox, treeY + 28);
+    }
+
+    // Buildings with neon outline glow
+    buildings.forEach(b => {
+      ctx.font = '95px serif';
+      ctx.fillText(b.emoji, b.x + ox, treeY + 28);
+    });
+
+    // Farm
+    farm.forEach(f => {
+      if (!f.abducted) {
+        ctx.font = f.h + 'px serif';
+        ctx.fillText(f.emoji, f.x + ox, f.y);
+      }
+    });
+  });
+
+  // UFO beam
+  if (ufo.size > 1 && ufo.beamAlpha > 0 && ufo.state === 'ABDUCTING') {
+    ctx.save();
+    const bx = ufo.x - cameraX + ufo.size / 2;
+    const grad = ctx.createLinearGradient(0, ufo.y, 0, groundY + 80);
+    grad.addColorStop(0, `rgba(0,255,200,${ufo.beamAlpha})`);
+    grad.addColorStop(0.5, `rgba(0,200,255,${ufo.beamAlpha * 0.6})`);
+    grad.addColorStop(1, 'rgba(0,255,200,0)');
+    ctx.fillStyle = grad;
+    ctx.shadowColor = '#00ffcc';
+    ctx.shadowBlur  = 30;
+    ctx.beginPath();
+    ctx.moveTo(bx, ufo.y + ufo.size / 2);
+    ctx.lineTo(bx - UFO_BEAM_WIDTH, groundY + 80);
+    ctx.lineTo(bx + UFO_BEAM_WIDTH, groundY + 80);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // UFO
+  if (ufo.size > 1) {
+    drawGlow(() => {
+      ctx.font = ufo.size + 'px serif';
+      ctx.fillText('🛸', ufo.x - cameraX, ufo.y + ufo.size / 2);
+    }, '#00ffff', 25);
+  }
+
+  // Ground neon edge line
+  drawNeonLine(0, groundY + 20, canvas.width, groundY + 20, 'rgba(0,255,200,0.4)', 1, 8);
+}
+
+function drawSpace() {
+  ctx.fillStyle = '#000005';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const offsets = [-WORLD_W, 0, WORLD_W];
+
+  offsets.forEach(off => {
+    const ox = off - cameraX * 0.5;
+
+    // Stars (parallax)
+    stars.forEach(s => {
+      s.twinkle += 0.02;
+      ctx.globalAlpha = 0.3 + 0.4 * Math.sin(s.twinkle);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(s.x + ox * 0.4, s.y, 1.5, 1.5);
+      ctx.globalAlpha = 1;
+    });
+
+    ctx.font = '110px serif'; ctx.fillText('🪐', 500 + ox, 200);
+    ctx.font = '55px serif';  ctx.fillText('🌍', 2500 + ox, 400);
+
+    // Asteroids with glow
+    asteroids.forEach(a => {
+      ctx.save();
+      ctx.translate(a.x + ox, a.y);
+      ctx.rotate(a.rot);
+      drawGlow(() => {
+        ctx.font = '38px serif';
+        ctx.fillText('🪨', -19, 19);
+      }, '#ff8844', 8);
+      ctx.restore();
+    });
+
+    // Fuel tanks with glow
+    fuelTanks.forEach(f => {
+      if (!f.collected) {
+        drawGlow(() => {
+          ctx.font = '28px serif';
+          ctx.fillText('🔋', f.x + ox, f.y);
+        }, '#00ff88', 12);
+      }
+    });
+  });
+
+  // Portal
+  if (spaceDistance > 4000) {
+    const px = 1000 - (cameraX % WORLD_W);
+    const pulse = 0.85 + 0.15 * Math.sin(Date.now() * 0.004);
+    drawGlow(() => {
+      ctx.font = Math.round(110 * pulse) + 'px serif';
+      ctx.fillText('🌀', px - 55, canvas.height / 2 + 55);
+    }, '#cc00ff', 40);
+
+    // Portal label
+    if (spaceDistance > 4500) {
+      drawGlow(() => {
+        ctx.fillStyle = '#cc00ff';
+        ctx.font = '14px Orbitron, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('ENTER PORTAL', px, canvas.height / 2 - 70);
+        ctx.textAlign = 'left';
+      }, '#cc00ff', 15);
+    }
+  }
+
+  // Progress bar at top
+  const progress = Math.min(spaceDistance / 5000, 1);
+  drawGlow(() => {
+    ctx.fillStyle = 'rgba(204,0,255,0.15)';
+    ctx.fillRect(canvas.width * 0.2, 14, canvas.width * 0.6, 6);
+    ctx.fillStyle = '#cc00ff';
+    ctx.fillRect(canvas.width * 0.2, 14, canvas.width * 0.6 * progress, 6);
+  }, '#cc00ff', 10);
+}
+
+function drawPlayer() {
+  const px = player.x - cameraX;
+  const bobOffset = player.onGround ? Math.sin(player.bobTimer) * 3 : 0;
+  const py = player.y - bobOffset;
+
+  // Thruster flame in space
+  if (gameState === 'SPACE' && keys.jump && player.fuel > 0) {
+    drawGlow(() => {
+      ctx.font = '26px serif';
+      ctx.fillText('🔥', px - 13, py + 12);
+    }, '#ff6600', 20);
+  }
+
+  // Collision flash
+  if (player.collisionTimer > 0 && Math.floor(player.collisionTimer / 5) % 2 === 0) {
+    drawGlow(() => {
+      ctx.font = '44px serif';
+      ctx.fillText('💥', px - 22, py - 22);
+    }, '#ff4400', 20);
+  }
+
+  // Player aura glow ring
+  if (!player.isBeingAbducted) {
+    drawGlow(() => {
+      ctx.strokeStyle = 'rgba(0,255,255,0.15)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py - 20, 32, 0, Math.PI * 2);
+      ctx.stroke();
+    }, '#00ffff', 12);
+  }
+
+  // Beam capture glow
+  if (player.isBeingAbducted) {
+    drawGlow(() => {
+      ctx.strokeStyle = 'rgba(0,255,200,0.5)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(px, py - 20, 36, 0, Math.PI * 2);
+      ctx.stroke();
+    }, '#00ffcc', 25);
+  }
+
+  // Draw character
+  if (selectedChar.type === 'png') {
+    const img = player.dir === 'right' ? imgRight : imgLeft;
+    if (img.complete && img.naturalWidth > 0) {
+      ctx.save();
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur  = 14;
+      ctx.drawImage(img, px - 30, py - 62, 60, 62);
+      ctx.restore();
+    }
+  } else {
+    ctx.font = '48px serif';
+    const emoji = player.dir === 'right' ? selectedChar.right : selectedChar.left;
+    drawGlow(() => ctx.fillText(emoji, px - 24, py), '#00ffff', 10);
+  }
+}
+
+// ==================== MAIN LOOP ====================
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
